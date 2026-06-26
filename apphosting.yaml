@@ -1,0 +1,19 @@
+# Firebase App Hosting configuration file
+# See: https://firebase.google.com/docs/app-hosting/configure
+
+# Infrastructure setup
+runConfig:
+  minInstances: 0
+  maxInstances: 2
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512
+
+# Environment variables
+env:
+  # The Google Maps API Key needs to be baked into the client bundle, so it must be available during BUILD
+  - variable: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+    value: "AIzaSyAlrXvSIc6xA6rK3YaVA536XJi0074ToO4"
+    availability:
+      - BUILD
+      - RUNTIME
