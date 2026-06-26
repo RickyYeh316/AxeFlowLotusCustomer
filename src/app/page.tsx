@@ -10,7 +10,7 @@ import { mockDrivers } from '@/data/drivers';
 import { Driver, MapStyle, DriverStatus, VehicleType } from '@/types';
 import { db, hasFirebaseConfig, firebaseConfig as defaultEnvConfig } from '@/firebase/config';
 import { Key, AlertCircle, Play, Pause, Database, Check, UploadCloud } from 'lucide-react';
-import { initializeApp, getApps } from 'firebase/app';
+import { initializeApp, getApps, deleteApp } from 'firebase/app';
 import { getFirestore, collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 
 export default function Home() {
@@ -30,6 +30,7 @@ export default function Home() {
   // Firebase Live Stream States
   const [isLiveFirestore, setIsLiveFirestore] = useState<boolean>(false);
   const [firebaseProjectName, setFirebaseProjectName] = useState<string>('');
+  const [firebaseTrigger, setFirebaseTrigger] = useState<number>(0);
   
   // Animation/Simulation states
   const [isSimulating, setIsSimulating] = useState<boolean>(true);
@@ -54,6 +55,7 @@ export default function Home() {
     // Check if we have Firebase environment config
     if (hasFirebaseConfig) {
       setInputFirebaseConfig(defaultEnvConfig);
+      setFirebaseTrigger(prev => prev + 1); // trigger initial load if env config is present
     }
     
     setDrivers(mockDrivers);
@@ -163,7 +165,7 @@ export default function Home() {
     });
 
     return () => unsubscribe();
-  }, [inputFirebaseConfig.projectId]);
+  }, [firebaseTrigger]);
 
   // Real-time Local Movement Simulator (Used when Firestore is not active)
   useEffect(() => {
@@ -360,7 +362,7 @@ export default function Home() {
     setSelectedDriver(driver);
   };
 
-  const handleSaveConfigs = (e: React.FormEvent) => {
+  const handleSaveConfigs = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Save Google Maps Key
@@ -374,9 +376,11 @@ export default function Home() {
         const apps = getApps();
         const existingApp = apps.find(app => app.name === 'dynamic-taxi-app');
         
-        if (!existingApp) {
-          initializeApp(inputFirebaseConfig, 'dynamic-taxi-app');
+        if (existingApp) {
+          await deleteApp(existingApp);
         }
+        initializeApp(inputFirebaseConfig, 'dynamic-taxi-app');
+        setFirebaseTrigger(prev => prev + 1); // Trigger Firestore collection subscription
       } catch (err) {
         console.error("Dynamic Firebase initialization error:", err);
       }
