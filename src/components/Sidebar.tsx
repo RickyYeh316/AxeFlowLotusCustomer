@@ -3,32 +3,32 @@
 import React, { useState } from 'react';
 import { 
   Search, 
-  MapPin, 
   Settings, 
   Layers, 
-  Coffee, 
   Sparkles, 
   Briefcase, 
-  Wrench, 
   Compass, 
   Star, 
   ChevronLeft, 
   ChevronRight, 
-  Grid 
+  Grid,
+  Car,
+  UserCheck,
+  UserX
 } from 'lucide-react';
-import { Location, MapStyle } from '../types';
+import { Driver, MapStyle } from '../types';
 
 interface SidebarProps {
-  locations: Location[];
-  selectedLocation: Location | null;
-  onSelectLocation: (location: Location | null) => void;
+  locations: Driver[]; // Driver list (passed as locations for naming compatibility)
+  selectedLocation: Driver | null;
+  onSelectLocation: (location: Driver | null) => void;
   mapStyle: MapStyle;
   onChangeMapStyle: (style: MapStyle) => void;
   showTraffic: boolean;
   onToggleTraffic: () => void;
   searchQuery: string;
   onChangeSearchQuery: (query: string) => void;
-  selectedCategory: string;
+  selectedCategory: string; // vehicleType filter
   onChangeCategory: (category: string) => void;
 }
 
@@ -50,19 +50,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const categories = [
     { id: 'all', label: '全部', icon: Grid },
-    { id: 'showroom', label: '展示中心', icon: Sparkles },
-    { id: 'cafe', label: '咖啡館', icon: Coffee },
-    { id: 'office', label: '創客研發', icon: Briefcase },
-    { id: 'service', label: '服務中心', icon: Wrench },
+    { id: 'standard', label: '一般轎車', icon: Car },
+    { id: 'suv', label: '舒適 SUV', icon: Sparkles },
+    { id: 'luxury', label: '豪華商務', icon: Briefcase },
   ];
 
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'cafe': return <Coffee className="icon-sm text-cyan" />;
-      case 'showroom': return <Sparkles className="icon-sm text-gold" />;
-      case 'office': return <Briefcase className="icon-sm text-purple" />;
-      case 'service': return <Wrench className="icon-sm text-green" />;
-      default: return <MapPin className="icon-sm" />;
+  const getVehicleIcon = (vehicleType: string) => {
+    switch (vehicleType) {
+      case 'luxury': return <Briefcase className="icon-sm text-purple" />;
+      case 'suv': return <Sparkles className="icon-sm text-cyan" />;
+      default: return <Car className="icon-sm text-gold" />;
     }
   };
 
@@ -86,8 +83,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <Compass size={24} className="spinning-logo" />
             </div>
             <div>
-              <h1 className="brand-title">Lotus Portal</h1>
-              <p className="brand-subtitle">地圖探索平台</p>
+              <h1 className="brand-title">Taxi Dispatch</h1>
+              <p className="brand-subtitle">車隊即時調度平台</p>
             </div>
           </div>
           <button 
@@ -142,7 +139,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <input
             type="text"
             className="search-input"
-            placeholder="搜尋地點或地址..."
+            placeholder="搜尋司機姓名、車牌..."
             value={searchQuery}
             onChange={(e) => onChangeSearchQuery(e.target.value)}
           />
@@ -173,41 +170,77 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </div>
 
-        {/* Location List */}
+        {/* Driver List */}
         <div className="location-list">
           <div className="list-header">
-            <span>精選地點 ({locations.length})</span>
+            <span>在線車輛 ({locations.length})</span>
           </div>
 
           {locations.length > 0 ? (
             <div className="scroll-wrapper">
-              {locations.map((loc) => {
-                const isSelected = selectedLocation?.id === loc.id;
+              {locations.map((driver) => {
+                const isSelected = selectedLocation?.id === driver.id;
                 return (
                   <div
-                    key={loc.id}
+                    key={driver.id}
                     className={`location-card ${isSelected ? 'active' : ''} animate-fade-in`}
-                    onClick={() => onSelectLocation(loc)}
+                    onClick={() => onSelectLocation(driver)}
                   >
                     <div className="card-header">
-                      <span className={`category-badge ${loc.category}`}>
-                        {getCategoryIcon(loc.category)}
-                        {loc.category === 'showroom' && '展示中心'}
-                        {loc.category === 'cafe' && '咖啡館'}
-                        {loc.category === 'office' && '辦公室'}
-                        {loc.category === 'service' && '售後服務'}
+                      <span className={`category-badge ${driver.vehicleType}`}>
+                        {getVehicleIcon(driver.vehicleType)}
+                        {driver.vehicleType === 'luxury' && '豪華商務'}
+                        {driver.vehicleType === 'suv' && '舒適 SUV'}
+                        {driver.vehicleType === 'standard' && '一般轎車'}
                       </span>
-                      <div className="rating-badge">
-                        <Star size={12} className="star-icon" />
-                        <span>{loc.rating}</span>
-                      </div>
+                      
+                      {/* Driver Status Badge */}
+                      <span 
+                        style={{
+                          fontSize: '0.65rem',
+                          fontWeight: 700,
+                          padding: '2px 6px',
+                          borderRadius: '10px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          background: driver.status === 'busy' ? 'rgba(107, 114, 128, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                          color: driver.status === 'busy' ? '#9ca3af' : '#34d399'
+                        }}
+                      >
+                        {driver.status === 'busy' ? (
+                          <>
+                            <UserX size={10} />
+                            <span>客滿</span>
+                          </>
+                        ) : (
+                          <>
+                            <UserCheck size={10} />
+                            <span>空車</span>
+                          </>
+                        )}
+                      </span>
                     </div>
 
-                    <h3 className="location-name">{loc.name}</h3>
-                    <p className="location-address">{loc.address}</p>
+                    <h3 className="location-name" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>{driver.name} 司機</span>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        {driver.plateNumber}
+                      </span>
+                    </h3>
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                      <p className="location-address" style={{ margin: 0, fontSize: '0.7rem' }}>
+                        定位座標: {driver.lat.toFixed(4)}, {driver.lng.toFixed(4)}
+                      </p>
+                      <div className="rating-badge">
+                        <Star size={11} className="star-icon" />
+                        <span style={{ fontSize: '0.7rem' }}>{driver.rating}</span>
+                      </div>
+                    </div>
                     
                     {isSelected && (
-                      <p className="location-desc animate-fade-in">{loc.description}</p>
+                      <p className="location-desc animate-fade-in">{driver.description}</p>
                     )}
                   </div>
                 );
@@ -215,8 +248,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           ) : (
             <div className="empty-list animate-fade-in">
-              <Compass size={40} className="empty-icon" />
-              <p>找不到符合的地點</p>
+              <Car size={40} className="empty-icon" />
+              <p>找不到符合的車輛</p>
               <button 
                 className="btn-reset" 
                 onClick={() => {
@@ -224,7 +257,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onChangeCategory('all');
                 }}
               >
-                重設搜尋條件
+                重設篩選條件
               </button>
             </div>
           )}

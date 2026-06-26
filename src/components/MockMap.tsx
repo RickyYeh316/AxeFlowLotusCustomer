@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Location, MapStyle } from '../types';
+import { Driver, MapStyle } from '../types';
 import { ZoomIn, ZoomOut, Compass, Info } from 'lucide-react';
 
 interface MockMapProps {
-  locations: Location[];
-  selectedLocation: Location | null;
-  onSelectLocation: (location: Location | null) => void;
+  locations: Driver[]; // Driver list (passed as locations for naming compatibility)
+  selectedLocation: Driver | null;
+  onSelectLocation: (location: Driver | null) => void;
   mapStyle: MapStyle;
 }
 
@@ -120,6 +120,14 @@ export const MockMap: React.FC<MockMapProps> = ({
 
   const theme = themes[mapStyle] || themes.dark;
 
+  const getDriverColor = (driver: Driver, isSelected: boolean) => {
+    if (isSelected) return '#ff2a5f'; // Active Red
+    if (driver.status === 'busy') return '#6b7280'; // Gray for busy
+    
+    if (driver.vehicleType === 'luxury') return '#111827';
+    if (driver.vehicleType === 'suv') return '#0284c7';
+    return '#f59e0b'; // Gold for standard
+  };
 
   return (
     <div 
@@ -157,8 +165,8 @@ export const MockMap: React.FC<MockMapProps> = ({
       >
         <Info size={16} className="text-gold" />
         <div>
-          <span style={{ fontWeight: 700, display: 'block' }}>地圖預覽模式 (Demo Mode)</span>
-          <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>已載入台北區 Lotus 服務據點，提供點擊與流暢交互。</span>
+          <span style={{ fontWeight: 700, display: 'block' }}>計程車派車模擬模式</span>
+          <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>已載入台北區計程車車隊，每 1.5 秒更新移動行駛軌跡。</span>
         </div>
       </div>
 
@@ -169,7 +177,7 @@ export const MockMap: React.FC<MockMapProps> = ({
         style={{
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
           transformOrigin: '0 0',
-          transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.1, 0.8, 0.2, 1)',
+          transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.1, 0.8, 0.25, 1)',
         }}
       >
         {/* Grid Background */}
@@ -227,64 +235,109 @@ export const MockMap: React.FC<MockMapProps> = ({
         <text x="450" y="900" fill={theme.label} fontSize="14" fontWeight="bold" opacity="0.6">中正區</text>
         <text x="850" y="250" fill={theme.label} fontSize="14" fontWeight="bold" opacity="0.6">松山區</text>
 
-        {/* Pulsing Active Node Rings */}
-        {locations.map((loc) => {
-          const { x, y } = projectCoord(loc.lat, loc.lng);
-          const isSelected = selectedLocation?.id === loc.id;
-          
-          let color = '#6366f1'; // Indigo
-          if (loc.category === 'cafe') color = '#06b6d4'; // Cyan
-          if (loc.category === 'showroom') color = '#f59e0b'; // Gold
-          if (loc.category === 'office') color = '#a855f7'; // Purple
-          if (loc.category === 'service') color = '#10b981'; // Green
-          if (isSelected) color = '#ff2a5f'; // Active Red
+        {/* Dynamic Rotating Taxi Markers */}
+        {locations.map((driver) => {
+          const { x, y } = projectCoord(driver.lat, driver.lng);
+          const isSelected = selectedLocation?.id === driver.id;
+          const color = getDriverColor(driver, isSelected);
+
+          // Convert heading: SVG rotation rotates clockwise, 0 degrees is positive X (East)
+          // We subtract 90 since the car symbol 🚖 in unicode faces up (North, negative Y)
+          const rotationAngle = driver.heading - 90;
 
           return (
             <g 
-              key={loc.id} 
+              key={driver.id} 
               style={{ cursor: 'pointer' }}
               onClick={(e) => {
                 e.stopPropagation();
-                onSelectLocation(loc);
+                onSelectLocation(driver);
               }}
             >
-              {/* Pulsing outer ring */}
-              <circle
-                cx={x}
-                cy={y}
-                r={isSelected ? 22 : 12}
-                fill="none"
-                stroke={color}
-                strokeWidth="2"
-                opacity={isSelected ? 0.9 : 0.4}
-              >
-                <animate
-                  attributeName="r"
-                  values={`${isSelected ? 16 : 8};${isSelected ? 32 : 18};${isSelected ? 16 : 8}`}
-                  dur="2s"
-                  repeatCount="indefinite"
-                />
-                <animate
-                  attributeName="opacity"
-                  values="0.8;0;0.8"
-                  dur="2s"
-                  repeatCount="indefinite"
-                />
-              </circle>
+              {/* Group for Rotated Car Symbol */}
+              <g transform={`translate(${x}, ${y}) rotate(${rotationAngle})`} style={{ transition: 'transform 0.5s ease-out' }}>
+                {/* Pulsing outer ring */}
+                <circle
+                  cx="0"
+                  cy="0"
+                  r={isSelected ? 20 : 12}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth="2"
+                  opacity={isSelected ? 0.9 : 0.4}
+                >
+                  <animate
+                    attributeName="r"
+                    values={`${isSelected ? 14 : 8};${isSelected ? 28 : 16};${isSelected ? 14 : 8}`}
+                    dur="2s"
+                    repeatCount="indefinite"
+                  />
+                  <animate
+                    attributeName="opacity"
+                    values="0.8;0;0.8"
+                    dur="2s"
+                    repeatCount="indefinite"
+                  />
+                </circle>
 
-              {/* Solid Pin base */}
-              <circle
-                cx={x}
-                cy={y}
-                r={isSelected ? 10 : 6}
-                fill={color}
-                stroke="#ffffff"
-                strokeWidth={isSelected ? 3 : 2}
-                style={{
-                  filter: isSelected ? `drop-shadow(0 0 8px ${color})` : 'none',
-                  transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
-                }}
-              />
+                {/* Car Base Circle */}
+                <circle
+                  cx="0"
+                  cy="0"
+                  r={isSelected ? 12 : 9}
+                  fill={color}
+                  stroke="#ffffff"
+                  strokeWidth={isSelected ? 2.5 : 1.5}
+                  style={{
+                    filter: isSelected ? `drop-shadow(0 0 6px ${color})` : 'none',
+                  }}
+                />
+
+                {/* Direction Pointer arrow (pointing forward, which is "up" in the local rotated space) */}
+                <polygon
+                  points="0,-16 -4,-10 4,-10"
+                  fill={color}
+                  stroke="#ffffff"
+                  strokeWidth="1"
+                />
+
+                {/* Little Car Text Symbol */}
+                <text
+                  x="0"
+                  y="4"
+                  textAnchor="middle"
+                  fontSize={isSelected ? "11px" : "9px"}
+                  fill={driver.vehicleType === 'luxury' && !isSelected ? '#ffffff' : '#000000'}
+                  style={{ fontWeight: 'bold' }}
+                >
+                  🚕
+                </text>
+              </g>
+
+              {/* Group for Non-Rotated Text Label (so license plate stays upright) */}
+              <g transform={`translate(${x}, ${y})`}>
+                <rect
+                  x="-25"
+                  y={isSelected ? "22" : "15"}
+                  width="50"
+                  height="12"
+                  rx="3"
+                  fill={isSelected ? "#ff2a5f" : "rgba(10, 11, 20, 0.85)"}
+                  stroke="rgba(255,255,255,0.1)"
+                  strokeWidth="0.5"
+                />
+                <text
+                  x="0"
+                  y={isSelected ? "31" : "24"}
+                  textAnchor="middle"
+                  fontSize="7px"
+                  fill="#ffffff"
+                  fontWeight="bold"
+                  letterSpacing="0.05em"
+                >
+                  {driver.plateNumber}
+                </text>
+              </g>
             </g>
           );
         })}

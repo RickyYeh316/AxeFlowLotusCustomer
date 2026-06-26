@@ -1,14 +1,14 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { APIProvider } from '@vis.gl/react-google-maps';
 import { MapContainer } from '@/components/MapContainer';
 import { Sidebar } from '@/components/Sidebar';
 import { DetailCard } from '@/components/DetailCard';
 import { MockMap } from '@/components/MockMap';
-import { mockLocations } from '@/data/locations';
-import { Location, MapStyle } from '@/types';
-import { Key, AlertCircle } from 'lucide-react';
+import { mockDrivers } from '@/data/drivers';
+import { Driver, MapStyle } from '@/types';
+import { Key, AlertCircle, Play, Pause } from 'lucide-react';
 
 export default function Home() {
   // Read API key from environment variable
@@ -17,41 +17,108 @@ export default function Home() {
   // States
   const [apiKey, setApiKey] = useState<string>('');
   const [isLoaded, setIsLoaded] = useState(false);
-  
-  // Set state after mount to avoid hydration mismatch
-  useEffect(() => {
-    setApiKey(envApiKey === 'YOUR_GOOGLE_MAPS_API_KEY' ? '' : envApiKey);
-    setIsLoaded(true);
-  }, [envApiKey]);
-
-  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [mapStyle, setMapStyle] = useState<MapStyle>('dark');
   const [showTraffic, setShowTraffic] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all'); // vehicle type filter
   
+  // Animation/Simulation states
+  const [isSimulating, setIsSimulating] = useState<boolean>(true);
+  const driversRef = useRef<Driver[]>([]);
+
+  // Set state after mount to avoid hydration mismatch
+  useEffect(() => {
+    setApiKey(envApiKey === 'YOUR_GOOGLE_MAPS_API_KEY' ? '' : envApiKey);
+    setDrivers(mockDrivers);
+    driversRef.current = mockDrivers;
+    setIsLoaded(true);
+  }, [envApiKey]);
+
+  // Real-time Movement Simulator
+  // Simulates taxis driving along grid streets in Taipei
+  useEffect(() => {
+    if (!isSimulating) return;
+
+    const interval = setInterval(() => {
+      const updatedDrivers = driversRef.current.map((driver) => {
+        // 10% chance of changing direction (turning at an intersection)
+        let heading = driver.heading;
+        if (Math.random() < 0.1) {
+          const turns = [-90, 0, 90, 180];
+          const turn = turns[Math.floor(Math.random() * turns.length)];
+          heading = (heading + turn + 360) % 360;
+        }
+
+        // Convert heading to radians for calculation
+        // 0 degrees is East, 90 is North, 180 is West, 270 is South
+        const rad = (heading * Math.PI) / 180;
+        
+        // Speed: approx 0.0001 degrees per step (about 10-15 meters)
+        const speed = 0.00008 + Math.random() * 0.00004;
+        let newLat = driver.lat + Math.sin(rad) * speed;
+        let newLng = driver.lng + Math.cos(rad) * speed;
+
+        // Taipei boundary constraints
+        const minLat = 25.02;
+        const maxLat = 25.07;
+        const minLng = 121.51;
+        const maxLng = 121.57;
+
+        // Turn back if out of bounds
+        if (newLat < minLat || newLat > maxLat || newLng < minLng || newLng > maxLng) {
+          heading = (heading + 180) % 360;
+          newLat = Math.max(minLat, Math.min(maxLat, driver.lat));
+          newLng = Math.max(minLng, Math.min(maxLng, driver.lng));
+        }
+
+        return {
+          ...driver,
+          lat: newLat,
+          lng: newLng,
+          heading
+        };
+      });
+
+      // Update state and ref
+      setDrivers(updatedDrivers);
+      driversRef.current = updatedDrivers;
+
+      // Update selected driver reference to keep values in sync
+      if (selectedDriver) {
+        const currentSelected = updatedDrivers.find(d => d.id === selectedDriver.id);
+        if (currentSelected) {
+          setSelectedDriver(currentSelected);
+        }
+      }
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [isSimulating, selectedDriver]);
+
   // API Key management modal state
   const [showKeyModal, setShowKeyModal] = useState<boolean>(false);
   const [inputKey, setInputKey] = useState<string>('');
 
-  // Filter locations based on search query and category
-  const filteredLocations = useMemo(() => {
-    return mockLocations.filter((loc) => {
+  // Filter drivers based on search query and vehicle type category
+  const filteredDrivers = useMemo(() => {
+    return drivers.filter((driver) => {
       const matchesSearch = 
-        loc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        loc.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        loc.description.toLowerCase().includes(searchQuery.toLowerCase());
+        driver.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        driver.plateNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        driver.description.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesCategory = 
         selectedCategory === 'all' || 
-        loc.category === selectedCategory;
+        driver.vehicleType === selectedCategory;
 
       return matchesSearch && matchesCategory;
     });
-  }, [searchQuery, selectedCategory]);
+  }, [drivers, searchQuery, selectedCategory]);
 
-  const handleSelectLocation = (loc: Location | null) => {
-    setSelectedLocation(loc);
+  const handleSelectDriver = (driver: Driver | null) => {
+    setSelectedDriver(driver);
   };
 
   const handleSaveApiKey = (e: React.FormEvent) => {
@@ -91,7 +158,7 @@ export default function Home() {
             animation: 'spin 1s linear infinite',
             margin: '0 auto 16px auto'
           }} />
-          <p style={{ fontSize: '0.9rem', opacity: 0.8 }}>載入系統中...</p>
+          <p style={{ fontSize: '0.9rem', opacity: 0.8 }}>載入車隊系統中...</p>
         </div>
         <style jsx global>{`
           @keyframes spin {
@@ -104,7 +171,7 @@ export default function Home() {
 
   return (
     <div className="app-container">
-      {/* Dynamic API Key Badge Indicator */}
+      {/* Top Floating Control Row */}
       <div 
         style={{
           position: 'absolute',
@@ -112,52 +179,87 @@ export default function Home() {
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 40,
-          pointerEvents: 'auto'
+          pointerEvents: 'auto',
+          display: 'flex',
+          gap: 12
         }}
-        className="glass animate-fade-in"
       >
-        <button
-          onClick={() => {
-            setInputKey(apiKey);
-            setShowKeyModal(true);
-          }}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            padding: '8px 16px',
-            color: 'var(--text-primary)',
-            fontSize: '0.75rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8
-          }}
-        >
-          <Key size={14} className={hasValidKey ? 'text-green' : 'text-gold'} />
-          <span>
-            {hasValidKey ? 'Google Maps API: 已連線' : 'Google Maps API: 模擬模式 (按此點選設定)'}
-          </span>
-        </button>
+        {/* API Key Config Badge */}
+        <div className="glass">
+          <button
+            onClick={() => {
+              setInputKey(apiKey);
+              setShowKeyModal(true);
+            }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: '8px 16px',
+              color: 'var(--text-primary)',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8
+            }}
+          >
+            <Key size={14} className={hasValidKey ? 'text-green' : 'text-gold'} />
+            <span>
+              {hasValidKey ? 'Google Maps: 已連線' : 'Google Maps: 模擬模式 (設定金鑰)'}
+            </span>
+          </button>
+        </div>
+
+        {/* Simulation Control Badge */}
+        <div className="glass">
+          <button
+            onClick={() => setIsSimulating(!isSimulating)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: '8px 16px',
+              color: 'var(--text-primary)',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8
+            }}
+            title={isSimulating ? "暫停車輛移動" : "開始車輛移動"}
+          >
+            {isSimulating ? (
+              <>
+                <Pause size={14} className="text-cyan animate-pulse" />
+                <span>模擬移動中</span>
+              </>
+            ) : (
+              <>
+                <Play size={14} className="text-muted" />
+                <span>移動已暫停</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Main Map Area - Conditional Rendering */}
       {hasValidKey ? (
-        // API Provider key prop forces re-instantiation if key updates on the fly
         <APIProvider key={apiKey} apiKey={apiKey}>
           <MapContainer
-            locations={filteredLocations}
-            selectedLocation={selectedLocation}
-            onSelectLocation={handleSelectLocation}
+            locations={filteredDrivers}
+            selectedLocation={selectedDriver}
+            onSelectLocation={handleSelectDriver}
             mapStyle={mapStyle}
             showTraffic={showTraffic}
           />
         </APIProvider>
       ) : (
         <MockMap
-          locations={filteredLocations}
-          selectedLocation={selectedLocation}
-          onSelectLocation={handleSelectLocation}
+          locations={filteredDrivers}
+          selectedLocation={selectedDriver}
+          onSelectLocation={handleSelectDriver}
           mapStyle={mapStyle}
         />
       )}
@@ -166,9 +268,9 @@ export default function Home() {
       <div className="overlay-layout">
         {/* Sidebar Panel */}
         <Sidebar
-          locations={filteredLocations}
-          selectedLocation={selectedLocation}
-          onSelectLocation={handleSelectLocation}
+          locations={filteredDrivers}
+          selectedLocation={selectedDriver}
+          onSelectLocation={handleSelectDriver}
           mapStyle={mapStyle}
           onChangeMapStyle={setMapStyle}
           showTraffic={showTraffic}
@@ -179,10 +281,10 @@ export default function Home() {
           onChangeCategory={setSelectedCategory}
         />
 
-        {/* Selected Location Details Panel */}
+        {/* Selected Driver Details Panel */}
         <DetailCard
-          location={selectedLocation}
-          onClose={() => handleSelectLocation(null)}
+          location={selectedDriver}
+          onClose={() => handleSelectDriver(null)}
         />
       </div>
 
@@ -225,7 +327,7 @@ export default function Home() {
             </div>
             
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-              本應用程式將在 Firebase App Hosting 託管。若您想要在此測試實際的 Google Maps API 渲染，請在下方輸入您的金鑰。
+              本應用程式已整合 Firebase App Hosting。若您想在本地測試實際的 Google Maps API 渲染，請在下方輸入金鑰。
             </p>
 
             <form onSubmit={handleSaveApiKey} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
