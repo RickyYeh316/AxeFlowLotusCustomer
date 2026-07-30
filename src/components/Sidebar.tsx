@@ -17,6 +17,7 @@ import {
   UserX
 } from 'lucide-react';
 import { Driver, MapStyle } from '../types';
+import { useLiff } from '@/components/LiffProvider';
 
 interface SidebarProps {
   locations: Driver[]; // Driver list (passed as locations for naming compatibility)
@@ -47,6 +48,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  
+  const { isLoggedIn, profile, login, logout, isLoading } = useLiff();
 
   const categories = [
     { id: 'all', label: '全部', icon: Grid },
@@ -95,6 +98,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <Settings size={18} />
           </button>
         </header>
+
+        {/* LINE LIFF Login/Profile Panel */}
+        <div className="liff-panel" style={{ marginTop: -4, marginBottom: -4 }}>
+          {isLoading ? (
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', padding: 8 }}>
+              載入 LINE 服務中...
+            </div>
+          ) : isLoggedIn && profile ? (
+            <div className="line-profile-card animate-fade-in">
+              <div className="line-avatar-wrapper">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img 
+                  src={profile.pictureUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80"} 
+                  alt={profile.displayName} 
+                  className="line-avatar" 
+                />
+                <span className="line-status-dot"></span>
+              </div>
+              <div className="line-profile-info">
+                <span className="line-profile-name">{profile.displayName}</span>
+                <span className="line-profile-status">{profile.statusMessage || "LINE 已連線"}</span>
+              </div>
+              <button onClick={logout} className="btn-line-logout">
+                登出
+              </button>
+            </div>
+          ) : (
+            <div className="line-login-container animate-fade-in">
+              <p className="line-login-text">登入 LINE 即可啟用乘客調度與綁定官方帳號服務</p>
+              <button onClick={login} className="btn-line-login">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style={{ flexShrink: 0 }}>
+                  <path d="M24 10.3c0-4.8-5.4-8.8-12-8.8S0 5.5 0 10.3c0 4.3 4.3 7.9 10.1 8.7 1 .2 1.3.6 1.2 1.5l-.1 1.2c-.1.5.2.7.5.5 2-.9 8.2-4.8 10.8-8.2 1.1-1.3 1.5-2.5 1.5-3.7z"/>
+                </svg>
+                <span>LINE 快速登入</span>
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Floating Settings Drawer */}
         {showSettings && (
