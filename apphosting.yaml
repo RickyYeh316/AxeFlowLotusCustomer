@@ -49,3 +49,10 @@ env:
     availability:
       - BUILD
       - RUNTIME
+
+  # LINE LIFF Configuration
+  - variable: NEXT_PUBLIC_LINE_LIFF_ID
+    value: "2010906945-CM7UcKky"
+    availability:
+      - BUILD
+      - RUNTIME
