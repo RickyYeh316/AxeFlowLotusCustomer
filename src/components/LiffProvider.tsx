@@ -51,6 +51,9 @@ export const LiffProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (loggedIn) {
           const userProfile = await liff.getProfile();
           setProfile(userProfile);
+        } else if (liff.isInClient()) {
+          // Inside LINE client: trigger silent login automatically without showing a login button
+          liff.login();
         }
       } catch (err: unknown) {
         console.error("LIFF Initialization Error:", err);
