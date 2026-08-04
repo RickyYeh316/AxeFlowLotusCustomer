@@ -7,10 +7,12 @@ import { Driver } from '../types';
 interface DetailCardProps {
   location: Driver | null; // Driver (passed as location for naming compatibility)
   onClose: () => void;
+  onDispatch?: (driver: Driver) => Promise<boolean>;
 }
 
-export const DetailCard: React.FC<DetailCardProps> = ({ location: driver, onClose }) => {
+export const DetailCard: React.FC<DetailCardProps> = ({ location: driver, onClose, onDispatch }) => {
   const [dispatched, setDispatched] = useState(false);
+  const [isDispatching, setIsDispatching] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
   if (!driver) return null;
@@ -18,20 +20,40 @@ export const DetailCard: React.FC<DetailCardProps> = ({ location: driver, onClos
   // Reset state when driver changes
   const handleClose = () => {
     setDispatched(false);
+    setIsDispatching(false);
     setSuccessMsg('');
     onClose();
   };
 
   // Handler to simulate dispatching a taxi
-  const handleDispatch = () => {
-    setDispatched(true);
-    setSuccessMsg(`派車成功！已發送派遣通知給 ${driver.name} 司機，車牌 ${driver.plateNumber}，預計 5 分鐘內抵達您設定的起點。`);
-
-    // Auto-clear message after 6 seconds
-    setTimeout(() => {
-      setDispatched(false);
-      setSuccessMsg('');
-    }, 6000);
+  const handleDispatch = async () => {
+    if (!driver) return;
+    setIsDispatching(true);
+    
+    let success = false;
+    try {
+      if (onDispatch) {
+        success = await onDispatch(driver);
+      } else {
+        // Fallback to simulation
+        success = true;
+      }
+      
+      if (success) {
+        setDispatched(true);
+        setSuccessMsg(`派車成功！已發送派遣通知給 ${driver.name} 司機，車牌 ${driver.plateNumber}，預計 5 分鐘內抵達您設定的起點。`);
+        
+        // Auto-clear message after 6 seconds
+        setTimeout(() => {
+          setDispatched(false);
+          setSuccessMsg('');
+        }, 6000);
+      }
+    } catch (err) {
+      console.error("Dispatch click failed:", err);
+    } finally {
+      setIsDispatching(false);
+    }
   };
 
   const handleCall = () => {
