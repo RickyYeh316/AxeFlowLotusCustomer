@@ -11,12 +11,15 @@ import { Driver, MapStyle, DriverStatus, VehicleType } from '@/types';
 import { db, hasFirebaseConfig, firebaseConfig as defaultEnvConfig } from '@/firebase/config';
 import { Key, AlertCircle, Play, Pause, Database, Check, UploadCloud } from 'lucide-react';
 import { initializeApp, getApps, deleteApp } from 'firebase/app';
-import { getFirestore, collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { useLiff } from '@/components/LiffProvider';
 
 export default function Home() {
+  const { isLoggedIn, profile } = useLiff();
+
   // Read keys from environment
   const envApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-  
+
   // States
   const [apiKey, setApiKey] = useState<string>('');
   const [isLoaded, setIsLoaded] = useState(false);
@@ -26,12 +29,14 @@ export default function Home() {
   const [showTraffic, setShowTraffic] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all'); // vehicleType filter
-  
+  const [startAddress, setStartAddress] = useState<string>('台北車站 (起點)');
+  const [endAddress, setEndAddress] = useState<string>('台北 101 (終點)');
+
   // Firebase Live Stream States
   const [isLiveFirestore, setIsLiveFirestore] = useState<boolean>(false);
   const [firebaseProjectName, setFirebaseProjectName] = useState<string>('');
   const [firebaseTrigger, setFirebaseTrigger] = useState<number>(0);
-  
+
   // Animation/Simulation states
   const [isSimulating, setIsSimulating] = useState<boolean>(true);
   const driversRef = useRef<Driver[]>([]);
@@ -51,13 +56,13 @@ export default function Home() {
   // Load config on mount
   useEffect(() => {
     setApiKey(envApiKey === 'YOUR_GOOGLE_MAPS_API_KEY' ? '' : envApiKey);
-    
+
     // Check if we have Firebase environment config
     if (hasFirebaseConfig) {
       setInputFirebaseConfig(defaultEnvConfig);
       setFirebaseTrigger(prev => prev + 1); // trigger initial load if env config is present
     }
-    
+
     setDrivers(mockDrivers);
     driversRef.current = mockDrivers;
     setIsLoaded(true);
@@ -67,22 +72,22 @@ export default function Home() {
   const mapVehicleType = (maker: string, model: string): VehicleType => {
     const combinedStr = `${maker} ${model}`.toLowerCase();
     if (
-      combinedStr.includes('tesla') || 
-      combinedStr.includes('benz') || 
-      combinedStr.includes('mercedes') || 
-      combinedStr.includes('bmw') || 
-      combinedStr.includes('lexus') || 
-      combinedStr.includes('audi') || 
-      combinedStr.includes('luxury') || 
+      combinedStr.includes('tesla') ||
+      combinedStr.includes('benz') ||
+      combinedStr.includes('mercedes') ||
+      combinedStr.includes('bmw') ||
+      combinedStr.includes('lexus') ||
+      combinedStr.includes('audi') ||
+      combinedStr.includes('luxury') ||
       combinedStr.includes('尊榮')
     ) {
       return 'luxury';
     }
     if (
-      combinedStr.includes('suv') || 
-      combinedStr.includes('rav4') || 
-      combinedStr.includes('crv') || 
-      combinedStr.includes('kuga') || 
+      combinedStr.includes('suv') ||
+      combinedStr.includes('rav4') ||
+      combinedStr.includes('crv') ||
+      combinedStr.includes('kuga') ||
       combinedStr.includes('sienta') ||
       combinedStr.includes('休旅')
     ) {
@@ -98,7 +103,7 @@ export default function Home() {
 
     const dynamicApps = getApps();
     const dynamicApp = dynamicApps.find(app => app.name === 'dynamic-taxi-app');
-    
+
     if (dynamicApp) {
       try {
         activeDb = getFirestore(dynamicApp);
@@ -124,7 +129,7 @@ export default function Home() {
 
       snapshot.forEach((doc) => {
         const data = doc.data();
-        
+
         // Only display drivers that have active locations
         if (data.currentLocation && typeof data.currentLocation.lat === 'number') {
           let status: DriverStatus = 'offline';
@@ -133,10 +138,10 @@ export default function Home() {
           } else if (data.status === 2 || data.isWorking === true) {
             status = 'busy';
           }
-          
+
           const mappedDriver: Driver = {
             id: doc.id,
-            name: data.name || doc.id.split('@')[0], 
+            name: data.name || doc.id.split('@')[0],
             lat: data.currentLocation.lat,
             lng: data.currentLocation.lng,
             heading: data.currentLocation.bearing || 0,
@@ -147,7 +152,7 @@ export default function Home() {
             rating: data.rating || 4.9,
             reviewsCount: data.reviewsCount || Math.floor(Math.random() * 500) + 120,
             avatarUrl: data.avatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
-            description: data.carColor 
+            description: data.carColor
               ? `${data.carColor}色 ${data.carMaker || ''} ${data.carModel || ''}。車內舒適整潔，聯絡正常。`
               : "專業優質司機，定位服務正常連線中。"
           };
@@ -161,11 +166,75 @@ export default function Home() {
     }, (error) => {
       console.error("Firestore subscription error:", error);
       setIsLiveFirestore(false);
-      setIsSimulating(true); 
+      setIsSimulating(true);
     });
 
     return () => unsubscribe();
   }, [firebaseTrigger]);
+
+  // Sync LINE User Profile to Firestore "users" collection
+  useEffect(() => {
+    if (!isLoggedIn || !profile) return;
+
+    const syncUserProfile = async () => {
+      let activeDb = db;
+      const dynamicApps = getApps();
+      const dynamicApp = dynamicApps.find(app => app.name === 'dynamic-taxi-app');
+      if (dynamicApp) {
+        activeDb = getFirestore(dynamicApp);
+      }
+
+      if (!activeDb) return;
+
+      try {
+        const userRef = doc(activeDb, "users", profile.userId);
+        const userSnap = await getDoc(userRef);
+        const isNewUser = !userSnap.exists();
+
+        const userData = {
+          userId: profile.userId,
+          displayName: profile.displayName,
+          pictureUrl: profile.pictureUrl || "",
+          statusMessage: profile.statusMessage || "",
+          role: "passenger",
+          lastLoginAt: new Date(),
+          updatedAt: new Date()
+        };
+
+        if (isNewUser) {
+          // New User: Set registration timestamp and write profile
+          (userData as any).createdAt = new Date();
+          await setDoc(userRef, userData);
+
+          // Issue Welcome Coupon: Save to coupons with unique ID to prevent double issuance
+          const couponRef = doc(activeDb, "coupons", `${profile.userId}_WELCOME100`);
+          const welcomeCoupon = {
+            userId: profile.userId,
+            couponCode: "WELCOME100",
+            title: "新戶註冊乘車券",
+            description: "首次註冊叫車享 100 元折抵優惠，不限車款。",
+            discountAmount: 100,
+            minOrderAmount: 200,
+            status: "unused", // unused, used, expired
+            expiryDate: new Date(Date.now() + 3600000 * 24 * 30), // 30 days expiry
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+          await setDoc(couponRef, welcomeCoupon);
+          console.log("New user registered. WELCOME100 coupon issued.");
+          alert(`歡迎新加入！系統已自動發送「新戶註冊乘車券 (100元)」至您的優惠券！`);
+        } else {
+          // Existing User: Sync profile changes and update lastLoginAt using merge
+          await setDoc(userRef, userData, { merge: true });
+          console.log("LINE user profile synced to users collection successfully.");
+        }
+      } catch (err) {
+        console.error("Failed to sync user profile or issue welcome coupon:", err);
+      }
+    };
+
+    syncUserProfile();
+  }, [isLoggedIn, profile, firebaseTrigger]);
 
   // Real-time Local Movement Simulator (Used when Firestore is not active)
   useEffect(() => {
@@ -219,7 +288,7 @@ export default function Home() {
   }, [isSimulating, isLiveFirestore, selectedDriver]);
 
   // Seeding Mock Data to Firestore (One-click Helper)
-  const handleSeedDrivers = async () => {
+  const handleSeedDatabase = async () => {
     let activeDb = db;
     const dynamicApps = getApps();
     const dynamicApp = dynamicApps.find(app => app.name === 'dynamic-taxi-app');
@@ -233,7 +302,8 @@ export default function Home() {
     }
 
     try {
-      const seedData = [
+      // 1. Seed drivers
+      const driverData = [
         {
           email: "lin.driver@gmail.com",
           name: "林信宏",
@@ -332,26 +402,132 @@ export default function Home() {
         }
       ];
 
-      for (const item of seedData) {
+      for (const item of driverData) {
         await setDoc(doc(activeDb, "drivers", item.email), item);
       }
-      alert("成功寫入 4 筆計程車司機模擬資料至您 Firestore 中的 drivers 集合！");
+
+      // 2. Seed users (members)
+      const mockUsers = [
+        {
+          userId: "mock_user_ricky",
+          displayName: "Ricky Yeh",
+          pictureUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
+          statusMessage: "Lotus Customer!",
+          role: "passenger",
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        {
+          userId: "mock_user_amy",
+          displayName: "Amy Chen",
+          pictureUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80",
+          statusMessage: "每天搭乘優質計程車",
+          role: "passenger",
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      ];
+
+      for (const item of mockUsers) {
+        await setDoc(doc(activeDb, "users", item.userId), item);
+      }
+
+      // 3. Seed coupons
+      const mockCoupons = [
+        {
+          couponCode: "WELCOME100",
+          title: "新戶註冊乘車券",
+          description: "首次註冊叫車享 100 元折抵優惠，不限車款。",
+          discountAmount: 100,
+          minOrderAmount: 200,
+          expiryDate: new Date(Date.now() + 3600000 * 24 * 30),
+          status: "active",
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        {
+          couponCode: "LOTUS50",
+          title: "蓮花出行體驗券",
+          description: "蓮花尊榮商務車專屬體驗折價 50 元券。",
+          discountAmount: 50,
+          minOrderAmount: 150,
+          expiryDate: new Date(Date.now() + 3600000 * 24 * 15),
+          status: "active",
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        {
+          couponCode: "RAINY30",
+          title: "雨天出行關懷券",
+          description: "下雨天叫車關懷折抵 30 元券。",
+          discountAmount: 30,
+          minOrderAmount: 100,
+          expiryDate: new Date(Date.now() + 3600000 * 24 * 7),
+          status: "active",
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      ];
+
+      for (const item of mockCoupons) {
+        await setDoc(doc(activeDb, "coupons", item.couponCode), item);
+      }
+
+      // 4. Seed orders (historical trips)
+      const mockOrders = [
+        {
+          passengerId: "mock_user_amy",
+          passengerName: "Amy Chen",
+          passengerAvatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80",
+          driverId: "lin.driver@gmail.com",
+          driverName: "林信宏",
+          carPlate: "TDY-5866",
+          startAddress: "台北車站",
+          endAddress: "台北 101",
+          status: 2, // 2 = 已完成
+          statusText: "訂單已完成",
+          fare: 280,
+          createdAt: new Date(Date.now() - 3600000 * 2),
+          updatedAt: new Date(Date.now() - 3600000 * 2)
+        },
+        {
+          passengerId: "mock_user_ricky",
+          passengerName: "Ricky Yeh",
+          passengerAvatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
+          driverId: "chen.driver@gmail.com",
+          driverName: "陳建志",
+          carPlate: "TAX-9981",
+          startAddress: "市政府捷運站",
+          endAddress: "國父紀念館",
+          status: 2, // 2 = 已完成
+          statusText: "訂單已完成",
+          fare: 120,
+          createdAt: new Date(Date.now() - 3600000 * 24),
+          updatedAt: new Date(Date.now() - 3600000 * 24)
+        }
+      ];
+
+      for (const item of mockOrders) {
+        await addDoc(collection(activeDb, "orders"), item);
+      }
+
+      alert("成功初始化資料庫！已成功寫入 4 筆司機資料、2 筆會員資料、3 款優惠券及 2 筆歷史訂單！");
     } catch (error: any) {
       console.error("Firestore seeding failed:", error);
-      alert("寫入失敗：" + error.message + "\\n請檢查您的 Firestore 安全規則 (Security Rules) 是否已開放寫入。");
+      alert("寫入失敗：" + error.message + "\n請檢查您的 Firestore 安全規則 (Security Rules) 是否已開放寫入。");
     }
   };
 
   // Filter drivers based on search query and category
   const filteredDrivers = useMemo(() => {
     return drivers.filter((driver) => {
-      const matchesSearch = 
+      const matchesSearch =
         driver.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         driver.plateNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
         driver.description.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      const matchesCategory = 
-        selectedCategory === 'all' || 
+
+      const matchesCategory =
+        selectedCategory === 'all' ||
         driver.vehicleType === selectedCategory;
 
       return matchesSearch && matchesCategory;
@@ -364,7 +540,7 @@ export default function Home() {
 
   const handleSaveConfigs = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Save Google Maps Key
     if (inputApiKey.trim()) {
       setApiKey(inputApiKey.trim());
@@ -375,7 +551,7 @@ export default function Home() {
       try {
         const apps = getApps();
         const existingApp = apps.find(app => app.name === 'dynamic-taxi-app');
-        
+
         if (existingApp) {
           await deleteApp(existingApp);
         }
@@ -406,12 +582,51 @@ export default function Home() {
     driversRef.current = mockDrivers;
   };
 
+  // Dispatch Order Sender to Firestore
+  const handleDispatchDriver = async (driver: Driver): Promise<boolean> => {
+    let activeDb = db;
+    const dynamicApps = getApps();
+    const dynamicApp = dynamicApps.find(app => app.name === 'dynamic-taxi-app');
+    if (dynamicApp) {
+      activeDb = getFirestore(dynamicApp);
+    }
+
+    if (!activeDb) {
+      alert("請先設定並套用有效的 Firebase 憑證，以發送真實派車訂單！");
+      return false;
+    }
+
+    try {
+      const orderData = {
+        passengerId: isLoggedIn && profile ? profile.userId : "guest_user",
+        passengerName: isLoggedIn && profile ? profile.displayName : "訪客乘客",
+        passengerAvatar: isLoggedIn && profile ? (profile.pictureUrl || "") : "",
+        driverId: driver.id,
+        driverName: driver.name,
+        carPlate: driver.plateNumber,
+        startAddress: startAddress,
+        endAddress: endAddress,
+        status: 1, // 1 = 待處理/已指派 (Pending/Dispatched)
+        statusText: "已指派司機",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      await addDoc(collection(activeDb, "orders"), orderData);
+      return true;
+    } catch (error: any) {
+      console.error("Failed to create dispatch order:", error);
+      alert("叫車失敗：" + error.message);
+      return false;
+    }
+  };
+
   const hasValidKey = apiKey.startsWith('AIzaSy');
 
   return (
     <div className="app-container">
       {/* Top Floating Control Row */}
-      <div 
+      <div
         style={{
           position: 'absolute',
           top: 24,
@@ -445,8 +660,8 @@ export default function Home() {
           >
             <Database size={14} className={isLiveFirestore ? 'text-green' : 'text-gold'} />
             <span>
-              {isLiveFirestore 
-                ? `Firestore: ${firebaseProjectName} (已連線)` 
+              {isLiveFirestore
+                ? `Firestore: ${firebaseProjectName} (已連線)`
                 : 'Firestore: 模擬移動模式 (按此設定串接)'}
             </span>
           </button>
@@ -522,18 +737,23 @@ export default function Home() {
           onChangeSearchQuery={setSearchQuery}
           selectedCategory={selectedCategory}
           onChangeCategory={setSelectedCategory}
+          startAddress={startAddress}
+          onChangeStartAddress={setStartAddress}
+          endAddress={endAddress}
+          onChangeEndAddress={setEndAddress}
         />
 
         {/* Selected Driver Details Panel */}
         <DetailCard
           location={selectedDriver}
           onClose={() => handleSelectDriver(null)}
+          onDispatch={handleDispatchDriver}
         />
       </div>
 
       {/* API Key & Firebase Config Settings Overlay Modal */}
       {showConfigModal && (
-        <div 
+        <div
           style={{
             position: 'absolute',
             top: 0,
@@ -550,7 +770,7 @@ export default function Home() {
           }}
           onClick={() => setShowConfigModal(false)}
         >
-          <div 
+          <div
             className="glass animate-fade-in"
             style={{
               width: '90%',
@@ -570,7 +790,7 @@ export default function Home() {
               <Database size={24} className="text-cyan" />
               <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>系統與金鑰設定</h2>
             </div>
-            
+
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
               在此設定您的 Google Maps 與 Firebase 憑證。當填入有效的 Firebase 設定時，系統會自動斷開模擬器，並透過 WebSocket 即時串接您 Firestore 的車輛位置！
             </p>
@@ -608,7 +828,7 @@ export default function Home() {
                 <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: 6 }}>
                   2. Firebase Firestore 設定
                 </h3>
-                
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)' }}>
@@ -618,7 +838,7 @@ export default function Home() {
                       type="text"
                       placeholder="my-firebase-project"
                       value={inputFirebaseConfig.projectId}
-                      onChange={(e) => setInputFirebaseConfig({...inputFirebaseConfig, projectId: e.target.value})}
+                      onChange={(e) => setInputFirebaseConfig({ ...inputFirebaseConfig, projectId: e.target.value })}
                       style={{
                         width: '100%',
                         padding: 10,
@@ -639,7 +859,7 @@ export default function Home() {
                       type="text"
                       placeholder="AIzaSy..."
                       value={inputFirebaseConfig.apiKey}
-                      onChange={(e) => setInputFirebaseConfig({...inputFirebaseConfig, apiKey: e.target.value})}
+                      onChange={(e) => setInputFirebaseConfig({ ...inputFirebaseConfig, apiKey: e.target.value })}
                       style={{
                         width: '100%',
                         padding: 10,
@@ -662,7 +882,7 @@ export default function Home() {
                       type="text"
                       placeholder="project-id.firebaseapp.com"
                       value={inputFirebaseConfig.authDomain}
-                      onChange={(e) => setInputFirebaseConfig({...inputFirebaseConfig, authDomain: e.target.value})}
+                      onChange={(e) => setInputFirebaseConfig({ ...inputFirebaseConfig, authDomain: e.target.value })}
                       style={{
                         width: '100%',
                         padding: 10,
@@ -683,7 +903,7 @@ export default function Home() {
                       type="text"
                       placeholder="1:1234:web:abcd"
                       value={inputFirebaseConfig.appId}
-                      onChange={(e) => setInputFirebaseConfig({...inputFirebaseConfig, appId: e.target.value})}
+                      onChange={(e) => setInputFirebaseConfig({ ...inputFirebaseConfig, appId: e.target.value })}
                       style={{
                         width: '100%',
                         padding: 10,
@@ -702,16 +922,16 @@ export default function Home() {
               {isLiveFirestore && (
                 <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                    快速測試資料庫寫入 (Database Seeding)
+                    完整叫車系統資料庫初始化 (Seed: drivers, users, orders, coupons)
                   </label>
                   <button
                     type="button"
-                    onClick={handleSeedDrivers}
+                    onClick={handleSeedDatabase}
                     className="action-btn secondary"
-                    style={{ 
-                      width: '100%', 
-                      border: '1px solid #10b981', 
-                      color: '#34d399', 
+                    style={{
+                      width: '100%',
+                      border: '1px solid #10b981',
+                      color: '#34d399',
                       background: 'rgba(16, 185, 129, 0.05)',
                       display: 'flex',
                       alignItems: 'center',
@@ -720,7 +940,7 @@ export default function Home() {
                     }}
                   >
                     <UploadCloud size={16} />
-                    <span>寫入 4 筆計程車司機模擬資料至您的 Firestore</span>
+                    <span>初始化 4 個集合 (司機、會員、歷史訂單、優惠券)</span>
                   </button>
                 </div>
               )}

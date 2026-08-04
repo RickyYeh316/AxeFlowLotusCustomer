@@ -26,7 +26,7 @@ export const DetailCard: React.FC<DetailCardProps> = ({ location: driver, onClos
   const handleDispatch = () => {
     setDispatched(true);
     setSuccessMsg(`派車成功！已發送派遣通知給 ${driver.name} 司機，車牌 ${driver.plateNumber}，預計 5 分鐘內抵達您設定的起點。`);
-    
+
     // Auto-clear message after 6 seconds
     setTimeout(() => {
       setDispatched(false);
@@ -49,17 +49,17 @@ export const DetailCard: React.FC<DetailCardProps> = ({ location: driver, onClos
       <div className="detail-card-content glass">
         {/* Cover Avatar/Profile Image */}
         <div className="detail-img-container" style={{ height: '150px' }}>
-          <button 
-            className="btn-close-detail" 
+          <button
+            className="btn-close-detail"
             onClick={handleClose}
             aria-label="關閉"
           >
             &times;
           </button>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img 
-            src={driver.avatarUrl} 
-            alt={driver.name} 
+          <img
+            src={driver.avatarUrl}
+            alt={driver.name}
             className="detail-img"
             style={{ objectPosition: 'center 30%' }}
           />
@@ -78,15 +78,15 @@ export const DetailCard: React.FC<DetailCardProps> = ({ location: driver, onClos
               {getVehicleLabel(driver.vehicleType)}
             </span>
           </div>
-          
+
           <div className="detail-meta" style={{ marginTop: -4 }}>
             <div className="rating-badge">
               <span className="star-icon">★</span>
               <span>{driver.rating} ({driver.reviewsCount} 次服務)</span>
             </div>
-            
+
             {/* Status indicator */}
-            <span 
+            <span
               style={{
                 fontSize: '0.7rem',
                 fontWeight: 700,
@@ -107,7 +107,7 @@ export const DetailCard: React.FC<DetailCardProps> = ({ location: driver, onClos
               <Phone size={15} />
               <span>聯絡電話：{driver.phone}</span>
             </div>
-            
+
             <div className="detail-info-item">
               <ShieldCheck size={15} />
               <span>乘車保障：具備乘客責任險、GPS 全程軌跡記錄</span>
@@ -116,7 +116,7 @@ export const DetailCard: React.FC<DetailCardProps> = ({ location: driver, onClos
 
           {/* Success Message Banner */}
           {dispatched && (
-            <div 
+            <div
               className="animate-fade-in"
               style={{
                 backgroundColor: 'rgba(16, 185, 129, 0.15)',
@@ -138,8 +138,8 @@ export const DetailCard: React.FC<DetailCardProps> = ({ location: driver, onClos
 
           {/* Action Buttons */}
           <div className="detail-actions">
-            <button 
-              className="action-btn primary" 
+            <button
+              className="action-btn primary"
               onClick={handleDispatch}
               disabled={driver.status === 'busy'}
               style={{
@@ -150,7 +150,7 @@ export const DetailCard: React.FC<DetailCardProps> = ({ location: driver, onClos
               <Navigation size={15} />
               <span>{driver.status === 'busy' ? '暫時客滿' : '指派此車輛'}</span>
             </button>
-            <button 
+            <button
               className="action-btn secondary"
               onClick={handleCall}
             >

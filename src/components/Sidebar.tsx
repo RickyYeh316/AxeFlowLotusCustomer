@@ -31,6 +31,10 @@ interface SidebarProps {
   onChangeSearchQuery: (query: string) => void;
   selectedCategory: string; // vehicleType filter
   onChangeCategory: (category: string) => void;
+  startAddress: string;
+  onChangeStartAddress: (addr: string) => void;
+  endAddress: string;
+  onChangeEndAddress: (addr: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -45,6 +49,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onChangeSearchQuery,
   selectedCategory,
   onChangeCategory,
+  startAddress,
+  onChangeStartAddress,
+  endAddress,
+  onChangeEndAddress,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -113,7 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   src={profile.pictureUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80"} 
                   alt={profile.displayName} 
                   className="line-avatar" 
-                />
+                  />
                 <span className="line-status-dot"></span>
               </div>
               <div className="line-profile-info">
@@ -209,6 +217,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             );
           })}
+        </div>
+
+        {/* Route Planner Section */}
+        <div style={{ padding: '0 16px 16px 16px', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Compass size={14} className="text-cyan" />
+            <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>乘車起訖點設定</span>
+          </div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/* Start Address */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.02)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', flexShrink: 0 }} />
+              <input
+                type="text"
+                value={startAddress}
+                onChange={(e) => onChangeStartAddress(e.target.value)}
+                placeholder="輸入乘車起點..."
+                style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '0.75rem', width: '100%', outline: 'none' }}
+              />
+            </div>
+            
+            {/* End Address */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.02)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />
+              <input
+                type="text"
+                value={endAddress}
+                onChange={(e) => onChangeEndAddress(e.target.value)}
+                placeholder="輸入下車終點..."
+                style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '0.75rem', width: '100%', outline: 'none' }}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Driver List */}
