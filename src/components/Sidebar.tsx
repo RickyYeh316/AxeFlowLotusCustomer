@@ -323,28 +323,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </button>
                 ) : (
                   <button
-                    onClick={login}
-                    className="action-btn"
+                    disabled
                     style={{
                       width: '100%',
                       padding: '14px',
                       borderRadius: 'var(--radius-md)',
-                      background: '#06C755',
-                      color: 'white',
-                      border: 'none',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      color: 'var(--text-muted)',
+                      border: '1px solid var(--border-color)',
                       fontWeight: 700,
                       fontSize: '0.9rem',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 8,
-                      cursor: 'pointer'
+                      cursor: 'not-allowed'
                     }}
                   >
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                      <path d="M24 10.3c0-4.8-5.4-8.8-12-8.8S0 5.5 0 10.3c0 4.3 4.3 7.9 10.1 8.7 1 .2 1.3.6 1.2 1.5l-.1 1.2c-.1.5.2.7.5.5 2-.9 8.2-4.8 10.8-8.2 1.1-1.3 1.5-2.5 1.5-3.7z" />
-                    </svg>
-                    <span>請先登入 LINE 帳號</span>
+                    <span>請由上方登入以開始叫車</span>
                   </button>
                 )}
               </div>
