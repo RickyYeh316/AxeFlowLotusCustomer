@@ -11,7 +11,7 @@ import { Driver, MapStyle, DriverStatus, VehicleType } from '@/types';
 import { db, hasFirebaseConfig, firebaseConfig as defaultEnvConfig } from '@/firebase/config';
 import { Key, AlertCircle, Play, Pause, Database, Check, UploadCloud } from 'lucide-react';
 import { initializeApp, getApps, deleteApp } from 'firebase/app';
-import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, serverTimestamp, getDoc, query, where } from 'firebase/firestore';
 import { useLiff } from '@/components/LiffProvider';
 
 export default function Home() {
@@ -27,10 +27,17 @@ export default function Home() {
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [mapStyle, setMapStyle] = useState<MapStyle>('dark');
   const [showTraffic, setShowTraffic] = useState<boolean>(false);
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all'); // vehicleType filter
   const [startAddress, setStartAddress] = useState<string>('台北車站 (起點)');
   const [endAddress, setEndAddress] = useState<string>('台北 101 (終點)');
+
+  // New Taxi Dispatch State Machine
+  const [bookingStatus, setBookingStatus] = useState<'idle' | 'searching' | 'assigned'>('idle');
+  const [assignedDriver, setAssignedDriver] = useState<Driver | null>(null);
+  const [isSenior, setIsSenior] = useState<boolean>(false);
+  const [selectedCouponId, setSelectedCouponId] = useState<string>('');
+  const [availableCoupons, setAvailableCoupons] = useState<any[]>([]);
+  const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
+  const [dispatchTimer, setDispatchTimer] = useState<any>(null);
 
   // Firebase Live Stream States
   const [isLiveFirestore, setIsLiveFirestore] = useState<boolean>(false);
@@ -235,6 +242,83 @@ export default function Home() {
 
     syncUserProfile();
   }, [isLoggedIn, profile, firebaseTrigger]);
+
+  // Subscribe to available coupons of the LINE user
+  useEffect(() => {
+    if (!isLoggedIn || !profile) {
+      setAvailableCoupons([]);
+      return;
+    }
+
+    let activeDb = db;
+    const dynamicApps = getApps();
+    const dynamicApp = dynamicApps.find(app => app.name === 'dynamic-taxi-app');
+    if (dynamicApp) {
+      activeDb = getFirestore(dynamicApp);
+    }
+
+    if (!activeDb) return;
+
+    const q = query(
+      collection(activeDb, "coupons"),
+      where("userId", "==", profile.userId),
+      where("status", "==", "unused")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        list.push({
+          id: doc.id,
+          ...data
+        });
+      });
+      setAvailableCoupons(list);
+    }, (err) => {
+      console.error("Failed to query user coupons:", err);
+    });
+
+    return () => unsubscribe();
+  }, [isLoggedIn, profile, firebaseTrigger]);
+
+  // Subscribe to the current active order
+  useEffect(() => {
+    if (!currentOrderId) return;
+
+    let activeDb = db;
+    const dynamicApps = getApps();
+    const dynamicApp = dynamicApps.find(app => app.name === 'dynamic-taxi-app');
+    if (dynamicApp) {
+      activeDb = getFirestore(dynamicApp);
+    }
+
+    if (!activeDb) return;
+
+    const unsubscribe = onSnapshot(doc(activeDb, "orders", currentOrderId), (docSnap) => {
+      if (!docSnap.exists()) return;
+      const data = docSnap.data();
+
+      if (data.status === 0) {
+        // Order cancelled
+        setBookingStatus('idle');
+        setAssignedDriver(null);
+        setCurrentOrderId(null);
+      } else if (data.driverId) {
+        // Driver accepted the order!
+        // Find driver details from current list of drivers
+        const foundDriver = driversRef.current.find(d => d.id === data.driverId) || mockDrivers.find(d => d.id === data.driverId);
+        if (foundDriver) {
+          setAssignedDriver(foundDriver);
+          setBookingStatus('assigned');
+        }
+      }
+    }, (err) => {
+      console.error("Failed to query active order status:", err);
+    });
+
+    return () => unsubscribe();
+  }, [currentOrderId]);
 
   // Real-time Local Movement Simulator (Used when Firestore is not active)
   useEffect(() => {
@@ -447,7 +531,7 @@ export default function Home() {
         },
         {
           couponCode: "LOTUS50",
-          title: "蓮花出行體驗券",
+          title: "建豐車行體驗券",
           description: "蓮花尊榮商務車專屬體驗折價 50 元券。",
           discountAmount: 50,
           minOrderAmount: 150,
@@ -518,21 +602,14 @@ export default function Home() {
     }
   };
 
-  // Filter drivers based on search query and category
-  const filteredDrivers = useMemo(() => {
-    return drivers.filter((driver) => {
-      const matchesSearch =
-        driver.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        driver.plateNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        driver.description.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchesCategory =
-        selectedCategory === 'all' ||
-        driver.vehicleType === selectedCategory;
-
-      return matchesSearch && matchesCategory;
-    });
-  }, [drivers, searchQuery, selectedCategory]);
+  // Display only the assigned vehicle if booked, otherwise hide all vehicles
+  const displayedDrivers = useMemo(() => {
+    if (bookingStatus === 'assigned' && assignedDriver) {
+      const liveDriver = drivers.find(d => d.id === assignedDriver.id);
+      return liveDriver ? [liveDriver] : [assignedDriver];
+    }
+    return [];
+  }, [bookingStatus, assignedDriver, drivers]);
 
   const handleSelectDriver = (driver: Driver | null) => {
     setSelectedDriver(driver);
@@ -582,8 +659,8 @@ export default function Home() {
     driversRef.current = mockDrivers;
   };
 
-  // Dispatch Order Sender to Firestore
-  const handleDispatchDriver = async (driver: Driver): Promise<boolean> => {
+  // Start Booking Flow - Creates Order in Firestore and triggers 5-second simulated acceptance
+  const handleStartBooking = async () => {
     let activeDb = db;
     const dynamicApps = getApps();
     const dynamicApp = dynamicApps.find(app => app.name === 'dynamic-taxi-app');
@@ -591,34 +668,109 @@ export default function Home() {
       activeDb = getFirestore(dynamicApp);
     }
 
-    if (!activeDb) {
-      alert("請先設定並套用有效的 Firebase 憑證，以發送真實派車訂單！");
-      return false;
+    setBookingStatus('searching');
+    setAssignedDriver(null);
+
+    // 1. Create order payload
+    const orderData = {
+      passengerId: isLoggedIn && profile ? profile.userId : "mock_user_ricky",
+      passengerName: isLoggedIn && profile ? profile.displayName : "Ricky Yeh",
+      passengerAvatar: isLoggedIn && profile ? (profile.pictureUrl || "") : "",
+      driverId: "", // Empty initially! No driver has accepted yet.
+      driverName: "",
+      carPlate: "",
+      startAddress: startAddress,
+      endAddress: endAddress,
+      isSenior: isSenior,
+      couponId: selectedCouponId || "",
+      status: 1, // 1 = 待處理/已指派 (Pending/Searching)
+      statusText: "尋找司機中...",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+
+    let createdOrderId = "";
+    if (activeDb) {
+      try {
+        const docRef = await addDoc(collection(activeDb, "orders"), orderData);
+        createdOrderId = docRef.id;
+        setCurrentOrderId(createdOrderId);
+      } catch (err) {
+        console.error("Failed to write order to Firestore:", err);
+      }
+    } else {
+      // Local Mock Mode: generate random order ID
+      createdOrderId = `mock_order_${Date.now()}`;
+      setCurrentOrderId(createdOrderId);
     }
 
-    try {
-      const orderData = {
-        passengerId: isLoggedIn && profile ? profile.userId : "guest_user",
-        passengerName: isLoggedIn && profile ? profile.displayName : "訪客乘客",
-        passengerAvatar: isLoggedIn && profile ? (profile.pictureUrl || "") : "",
-        driverId: driver.id,
-        driverName: driver.name,
-        carPlate: driver.plateNumber,
-        startAddress: startAddress,
-        endAddress: endAddress,
-        status: 1, // 1 = 待處理/已指派 (Pending/Dispatched)
-        statusText: "已指派司機",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
+    // 2. Simulate Driver Acceptance Timer (5 seconds)
+    const timer = setTimeout(async () => {
+      // Select a random driver from current list of online drivers
+      const availableDriversList = driversRef.current.filter(d => d.status === 'online');
+      const fallbackList = driversRef.current.length > 0 ? driversRef.current : mockDrivers;
+      const pool = availableDriversList.length > 0 ? availableDriversList : fallbackList;
+      const selected = pool[Math.floor(Math.random() * pool.length)];
 
-      await addDoc(collection(activeDb, "orders"), orderData);
-      return true;
-    } catch (error: any) {
-      console.error("Failed to create dispatch order:", error);
-      alert("叫車失敗：" + error.message);
-      return false;
+      if (!selected) return;
+
+      if (activeDb && createdOrderId) {
+        // Update the order in Firestore
+        try {
+          const orderRef = doc(activeDb, "orders", createdOrderId);
+          await setDoc(orderRef, {
+            driverId: selected.id,
+            driverName: selected.name,
+            carPlate: selected.plateNumber,
+            status: 3, // 3 = 行程中/前往接駁中 (Driving/En Route)
+            statusText: "司機接單前往中",
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        } catch (err) {
+          console.error("Failed to update order with driver:", err);
+        }
+      } else {
+        // Local Mock Mode update
+        setAssignedDriver(selected);
+        setBookingStatus('assigned');
+      }
+
+      alert(`司機已接單！為您媒合到：${selected.name} 司機，車牌 ${selected.plateNumber}。`);
+    }, 5000);
+
+    setDispatchTimer(timer);
+  };
+
+  // Cancel Booking Flow - Cancel order in Firestore and reset local states
+  const handleCancelBooking = async () => {
+    if (dispatchTimer) {
+      clearTimeout(dispatchTimer);
+      setDispatchTimer(null);
     }
+
+    let activeDb = db;
+    const dynamicApps = getApps();
+    const dynamicApp = dynamicApps.find(app => app.name === 'dynamic-taxi-app');
+    if (dynamicApp) {
+      activeDb = getFirestore(dynamicApp);
+    }
+
+    if (activeDb && currentOrderId) {
+      try {
+        const orderRef = doc(activeDb, "orders", currentOrderId);
+        await setDoc(orderRef, {
+          status: 0, // 0 = 已取消
+          statusText: "訂單已取消",
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (err) {
+        console.error("Failed to cancel order in Firestore:", err);
+      }
+    }
+
+    setBookingStatus('idle');
+    setAssignedDriver(null);
+    setCurrentOrderId(null);
   };
 
   const hasValidKey = apiKey.startsWith('AIzaSy');
@@ -706,8 +858,8 @@ export default function Home() {
       {hasValidKey ? (
         <APIProvider key={apiKey} apiKey={apiKey}>
           <MapContainer
-            locations={filteredDrivers}
-            selectedLocation={selectedDriver}
+            locations={displayedDrivers}
+            selectedLocation={assignedDriver}
             onSelectLocation={handleSelectDriver}
             mapStyle={mapStyle}
             showTraffic={showTraffic}
@@ -715,8 +867,8 @@ export default function Home() {
         </APIProvider>
       ) : (
         <MockMap
-          locations={filteredDrivers}
-          selectedLocation={selectedDriver}
+          locations={displayedDrivers}
+          selectedLocation={assignedDriver}
           onSelectLocation={handleSelectDriver}
           mapStyle={mapStyle}
         />
@@ -726,28 +878,23 @@ export default function Home() {
       <div className="overlay-layout">
         {/* Sidebar Panel */}
         <Sidebar
-          locations={filteredDrivers}
-          selectedLocation={selectedDriver}
-          onSelectLocation={handleSelectDriver}
           mapStyle={mapStyle}
           onChangeMapStyle={setMapStyle}
           showTraffic={showTraffic}
           onToggleTraffic={() => setShowTraffic(!showTraffic)}
-          searchQuery={searchQuery}
-          onChangeSearchQuery={setSearchQuery}
-          selectedCategory={selectedCategory}
-          onChangeCategory={setSelectedCategory}
           startAddress={startAddress}
           onChangeStartAddress={setStartAddress}
           endAddress={endAddress}
           onChangeEndAddress={setEndAddress}
-        />
-
-        {/* Selected Driver Details Panel */}
-        <DetailCard
-          location={selectedDriver}
-          onClose={() => handleSelectDriver(null)}
-          onDispatch={handleDispatchDriver}
+          isSenior={isSenior}
+          onChangeIsSenior={setIsSenior}
+          selectedCouponId={selectedCouponId}
+          onChangeSelectedCouponId={setSelectedCouponId}
+          availableCoupons={availableCoupons}
+          bookingStatus={bookingStatus}
+          assignedDriver={assignedDriver}
+          onStartBooking={handleStartBooking}
+          onCancelBooking={handleCancelBooking}
         />
       </div>
 
