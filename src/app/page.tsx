@@ -15,7 +15,7 @@ import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, serverTimest
 import { useLiff } from '@/components/LiffProvider';
 
 export default function Home() {
-  const { isLoggedIn, profile, isLoading } = useLiff();
+  const { isLoggedIn, profile, isLoading, liff } = useLiff();
 
   // Read keys from environment
   const envApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
@@ -53,6 +53,29 @@ export default function Home() {
   // Animation/Simulation states
   const [isSimulating, setIsSimulating] = useState<boolean>(true);
   const driversRef = useRef<Driver[]>([]);
+
+  // Ref to track if LINE message has been sent for a specific order to prevent duplication
+  const messageSentForOrderRef = useRef<string | null>(null);
+
+  // Helper to send LINE notification message via LIFF SDK
+  const sendOrderMatchedLineMessage = async (orderId: string, driver: Driver) => {
+    if (!orderId || messageSentForOrderRef.current === orderId) return;
+    messageSentForOrderRef.current = orderId;
+
+    if (liff && liff.isInClient()) {
+      try {
+        await liff.sendMessages([
+          {
+            type: 'text',
+            text: `🚖【建豐叫車 - 派車成功通知】\n\n已成功為您媒合到車輛！\n\n👤 司機姓名：${driver.name}\n🚗 車牌號碼：${driver.plateNumber}\n📱 司機電話：${driver.phone || "暫無"}\n📍 乘車起點：${startAddress}\n📍 乘車終點：${endAddress}\n\n司機正前往接駁，感謝您的使用！`
+          }
+        ]);
+        console.log("LINE dispatch message sent successfully via LIFF.");
+      } catch (err) {
+        console.error("Failed to send LINE message via LIFF:", err);
+      }
+    }
+  };
 
   // Settings Modal State
   const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
@@ -317,6 +340,7 @@ export default function Home() {
         if (foundDriver) {
           setAssignedDriver(foundDriver);
           setBookingStatus('assigned');
+          sendOrderMatchedLineMessage(currentOrderId, foundDriver);
         }
       }
     }, (err) => {
@@ -741,6 +765,7 @@ export default function Home() {
         // Local Mock Mode update
         setAssignedDriver(selected);
         setBookingStatus('assigned');
+        sendOrderMatchedLineMessage(createdOrderId, selected);
       }
 
       alert(`司機已接單！為您媒合到：${selected.name} 司機，車牌 ${selected.plateNumber}。`);
