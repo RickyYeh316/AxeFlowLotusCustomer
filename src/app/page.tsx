@@ -43,6 +43,7 @@ export default function Home() {
   const [mapSelectingMode, setMapSelectingMode] = useState<'idle' | 'start' | 'end'>('idle');
   const [startLatLng, setStartLatLng] = useState<{ lat: number; lng: number } | null>(null);
   const [endLatLng, setEndLatLng] = useState<{ lat: number; lng: number } | null>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
 
   // Firebase Live Stream States
   const [isLiveFirestore, setIsLiveFirestore] = useState<boolean>(false);
@@ -783,6 +784,7 @@ export default function Home() {
   // Map Pin Selection Handlers
   const handleStartMapSelection = (mode: 'start' | 'end') => {
     setMapSelectingMode(mode);
+    setIsSidebarCollapsed(true); // 自動收起側邊欄，釋放全螢幕視野
   };
 
   const handleResolveAddress = (address: string, lat: number, lng: number) => {
@@ -794,10 +796,12 @@ export default function Home() {
       setEndLatLng({ lat, lng });
     }
     setMapSelectingMode('idle');
+    setIsSidebarCollapsed(false); // 自動展開側邊欄，讓用戶確認細節與點擊叫車
   };
 
   const handleCancelSelection = () => {
     setMapSelectingMode('idle');
+    setIsSidebarCollapsed(false); // 自動展開側邊欄，還原叫車介面
   };
 
   const hasValidKey = apiKey.startsWith('AIzaSy');
@@ -915,6 +919,8 @@ export default function Home() {
           onChangeMapStyle={setMapStyle}
           showTraffic={showTraffic}
           onToggleTraffic={() => setShowTraffic(!showTraffic)}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={setIsSidebarCollapsed}
           startAddress={startAddress}
           onChangeStartAddress={setStartAddress}
           endAddress={endAddress}

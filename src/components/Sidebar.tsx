@@ -27,6 +27,10 @@ interface SidebarProps {
   onChangeMapStyle: (style: MapStyle) => void;
   showTraffic: boolean;
   onToggleTraffic: () => void;
+  
+  // Collapse controls
+  isCollapsed: boolean;
+  onToggleCollapse: (collapsed: boolean) => void;
 
   // Route inputs
   startAddress: string;
@@ -57,6 +61,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onChangeMapStyle,
   showTraffic,
   onToggleTraffic,
+  isCollapsed,
+  onToggleCollapse,
   startAddress,
   onChangeStartAddress,
   endAddress,
@@ -73,7 +79,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onStartBooking,
   onCancelBooking,
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
   const { isLoggedIn, profile, login, logout, isLoading } = useLiff();
@@ -97,9 +102,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <div className={`sidebar-container ${isCollapsed ? 'collapsed' : ''}`}>
       {/* Collapse Toggle Button */}
-      <button
-        className="sidebar-toggle glass"
-        onClick={() => setIsCollapsed(!isCollapsed)}
+      <button 
+        className="sidebar-toggle glass" 
+        onClick={() => onToggleCollapse(!isCollapsed)}
         aria-label={isCollapsed ? "展開側邊欄" : "收合側邊欄"}
         title={isCollapsed ? "展開側邊欄" : "收合側邊欄"}
       >
