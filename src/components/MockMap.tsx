@@ -2,13 +2,18 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Driver, MapStyle } from '../types';
-import { ZoomIn, ZoomOut, Compass, Info } from 'lucide-react';
+import { ZoomIn, ZoomOut, Compass, Info, MapPin } from 'lucide-react';
 
 interface MockMapProps {
   locations: Driver[]; // Driver list (passed as locations for naming compatibility)
   selectedLocation: Driver | null;
   onSelectLocation: (location: Driver | null) => void;
   mapStyle: MapStyle;
+  
+  // Selection mode props to match MapContainer
+  mapSelectingMode: 'idle' | 'start' | 'end';
+  onResolveAddress: (address: string, lat: number, lng: number) => void;
+  onCancelSelection: () => void;
 }
 
 export const MockMap: React.FC<MockMapProps> = ({
@@ -16,6 +21,9 @@ export const MockMap: React.FC<MockMapProps> = ({
   selectedLocation,
   onSelectLocation,
   mapStyle,
+  mapSelectingMode,
+  onResolveAddress,
+  onCancelSelection,
 }) => {
   // SVG Canvas view state
   const [zoom, setZoom] = useState(1);
@@ -25,32 +33,82 @@ export const MockMap: React.FC<MockMapProps> = ({
   
   const mapRef = useRef<HTMLDivElement>(null);
 
-  // Map lat/lng coordinates to 1000x1000 SVG coordinates
   // Taipei approx bounding box: Lat 25.02 to 25.07, Lng 121.51 to 121.57
   const minLat = 25.02;
   const maxLat = 25.07;
   const minLng = 121.51;
   const maxLng = 121.57;
 
+  // Local Selection States
+  const [resolvedAddress, setResolvedAddress] = useState<string>('正在解析地址...');
+  const [currentCenter, setCurrentCenter] = useState<{ lat: number; lng: number } | null>(null);
+
   const projectCoord = (lat: number, lng: number) => {
     const x = ((lng - minLng) / (maxLng - minLng)) * 1000;
-    // Invert Y for SVG coordinates
     const y = (1 - (lat - minLat) / (maxLat - minLat)) * 1000;
     return { x, y };
   };
+
+  // Reverse project to calculate center lat/lng of viewport
+  const getMapCenterLatLng = () => {
+    if (!mapRef.current) return { lat: 25.045, lng: 121.545 };
+    const rect = mapRef.current.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    
+    // Projected coordinates on 1000x1000 canvas
+    const x = (centerX - pan.x) / zoom;
+    const y = (centerY - pan.y) / zoom;
+    
+    // Reverse math formulas
+    const lng = minLng + (x / 1000) * (maxLng - minLng);
+    const lat = minLat + (1 - y / 1000) * (maxLat - minLat);
+    
+    return { lat, lng };
+  };
+
+  // Mock Reverse Geocode based on coordinates
+  const resolveMockAddress = (lat: number, lng: number) => {
+    // 1. Matched zones
+    if (lat > 25.05 && lng > 121.55) {
+      return { address: "台北松山機場 (敦化北路340-9號)", lat: 25.063, lng: 121.552 };
+    }
+    if (lat < 25.04 && lng < 121.53) {
+      return { address: "龍山寺捷運站 (廣州街211號)", lat: 25.035, lng: 121.503 };
+    }
+    if (lat > 25.05 && lng < 121.53) {
+      return { address: "行天宮 (民權東路二段109號)", lat: 25.059, lng: 121.533 };
+    }
+    if (lat < 25.04 && lng > 121.55) {
+      return { address: "台北101/世貿捷運站 (信義路五段7號)", lat: 25.033, lng: 121.564 };
+    }
+    if (lat < 25.04 && lng >= 121.53 && lng <= 121.55) {
+      return { address: "大安森林公園捷運站 (新生南路二段1號)", lat: 25.032, lng: 121.535 };
+    }
+    // Default fallback
+    return { address: "台北車站東一門 (北平西路3號)", lat: 25.047, lng: 121.517 };
+  };
+
+  // Trigger geocode resolution on dragging or pan changes
+  useEffect(() => {
+    if (mapSelectingMode === 'idle') return;
+    
+    const center = getMapCenterLatLng();
+    const resolved = resolveMockAddress(center.lat, center.lng);
+    setResolvedAddress(resolved.address);
+    setCurrentCenter({ lat: center.lat, lng: center.lng });
+  }, [pan, zoom, mapSelectingMode]);
 
   // Center on selected location when it changes
   useEffect(() => {
     if (selectedLocation) {
       const { x, y } = projectCoord(selectedLocation.lat, selectedLocation.lng);
       
-      // Calculate pan to center the point
       if (mapRef.current) {
         const rect = mapRef.current.getBoundingClientRect();
         const centerX = rect.width / 2;
         const centerY = rect.height / 2;
         
-        // Target pan = center - (projected point * zoom)
         setPan({
           x: centerX - (x * zoom),
           y: centerY - (y * zoom),
@@ -80,6 +138,12 @@ export const MockMap: React.FC<MockMapProps> = ({
 
   const handleZoom = (factor: number) => {
     setZoom(prev => Math.max(0.5, Math.min(3, prev * factor)));
+  };
+
+  const handleConfirm = () => {
+    if (currentCenter) {
+      onResolveAddress(resolvedAddress, currentCenter.lat, currentCenter.lng);
+    }
   };
 
   // Styling properties based on active mapStyle
@@ -146,29 +210,31 @@ export const MockMap: React.FC<MockMapProps> = ({
       onMouseLeave={handleMouseUp}
     >
       {/* Floating Demo Mode Banner */}
-      <div 
-        className="glass animate-fade-in"
-        style={{
-          position: 'absolute',
-          top: 24,
-          right: 24,
-          padding: '12px 18px',
-          zIndex: 100,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          pointerEvents: 'auto',
-          fontSize: '0.8rem',
-          maxWidth: 320,
-          color: mapStyle === 'retro' || mapStyle === 'standard' ? '#333' : '#fff'
-        }}
-      >
-        <Info size={16} className="text-gold" />
-        <div>
-          <span style={{ fontWeight: 700, display: 'block' }}>計程車派車模擬模式</span>
-          <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>已載入台北區計程車車隊，每 1.5 秒更新移動行駛軌跡。</span>
+      {mapSelectingMode === 'idle' && (
+        <div 
+          className="glass animate-fade-in"
+          style={{
+            position: 'absolute',
+            top: 24,
+            right: 24,
+            padding: '12px 18px',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            pointerEvents: 'auto',
+            fontSize: '0.8rem',
+            maxWidth: 320,
+            color: mapStyle === 'retro' || mapStyle === 'standard' ? '#333' : '#fff'
+          }}
+        >
+          <Info size={16} className="text-gold" />
+          <div>
+            <span style={{ fontWeight: 700, display: 'block' }}>計程車派車模擬模式</span>
+            <span style={{ opacity: 0.8, fontSize: '0.75rem' }}>已載入台北區計程車車隊，每 1.5 秒更新移動行駛軌跡。</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* SVG Canvas Map */}
       <svg
@@ -217,12 +283,10 @@ export const MockMap: React.FC<MockMapProps> = ({
         />
 
         {/* Major Grid/Road Lines (Taipei Grid System) */}
-        {/* Xinyi Road / Zhongxiao E Road (East-West lines) */}
         <line x1="-100" y1="350" x2="1200" y2="350" stroke={theme.roads} strokeWidth="12" />
         <line x1="-100" y1="580" x2="1200" y2="580" stroke={theme.roads} strokeWidth="16" />
         <line x1="-100" y1="780" x2="1200" y2="780" stroke={theme.roads} strokeWidth="14" />
         
-        {/* Fuxing / Dunhua / Zhongshan (North-South lines) */}
         <line x1="280" y1="-100" x2="280" y2="1200" stroke={theme.roads} strokeWidth="14" />
         <line x1="550" y1="-100" x2="550" y2="1200" stroke={theme.roads} strokeWidth="16" />
         <line x1="780" y1="-100" x2="780" y2="1200" stroke={theme.roads} strokeWidth="12" />
@@ -240,9 +304,6 @@ export const MockMap: React.FC<MockMapProps> = ({
           const { x, y } = projectCoord(driver.lat, driver.lng);
           const isSelected = selectedLocation?.id === driver.id;
           const color = getDriverColor(driver, isSelected);
-
-          // Convert heading: SVG rotation rotates clockwise, 0 degrees is positive X (East)
-          // We subtract 90 since the car symbol 🚖 in unicode faces up (North, negative Y)
           const rotationAngle = driver.heading - 90;
 
           return (
@@ -254,9 +315,7 @@ export const MockMap: React.FC<MockMapProps> = ({
                 onSelectLocation(driver);
               }}
             >
-              {/* Group for Rotated Car Symbol */}
               <g transform={`translate(${x}, ${y}) rotate(${rotationAngle})`} style={{ transition: 'transform 0.5s ease-out' }}>
-                {/* Pulsing outer ring */}
                 <circle
                   cx="0"
                   cy="0"
@@ -280,7 +339,6 @@ export const MockMap: React.FC<MockMapProps> = ({
                   />
                 </circle>
 
-                {/* Car Base Circle */}
                 <circle
                   cx="0"
                   cy="0"
@@ -293,7 +351,6 @@ export const MockMap: React.FC<MockMapProps> = ({
                   }}
                 />
 
-                {/* Direction Pointer arrow (pointing forward, which is "up" in the local rotated space) */}
                 <polygon
                   points="0,-16 -4,-10 4,-10"
                   fill={color}
@@ -301,7 +358,6 @@ export const MockMap: React.FC<MockMapProps> = ({
                   strokeWidth="1"
                 />
 
-                {/* Little Car Text Symbol */}
                 <text
                   x="0"
                   y="4"
@@ -314,7 +370,6 @@ export const MockMap: React.FC<MockMapProps> = ({
                 </text>
               </g>
 
-              {/* Group for Non-Rotated Text Label (so license plate stays upright) */}
               <g transform={`translate(${x}, ${y})`}>
                 <rect
                   x="-25"
@@ -344,56 +399,165 @@ export const MockMap: React.FC<MockMapProps> = ({
       </svg>
 
       {/* Map Zoom Controls */}
-      <div 
-        className="glass" 
-        style={{
-          position: 'absolute',
-          bottom: 24,
-          left: 24,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 6,
-          padding: 6,
-          zIndex: 100,
-          pointerEvents: 'auto'
-        }}
-      >
-        <button 
+      {mapSelectingMode === 'idle' && (
+        <div 
+          className="glass" 
           style={{
-            width: 36,
-            height: 36,
+            position: 'absolute',
+            bottom: 24,
+            left: 24,
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: 'none',
-            background: 'transparent',
-            color: 'var(--text-primary)',
-            cursor: 'pointer'
+            flexDirection: 'column',
+            gap: 6,
+            padding: 6,
+            zIndex: 100,
+            pointerEvents: 'auto'
           }}
-          onClick={() => handleZoom(1.25)}
-          title="放大"
         >
-          <ZoomIn size={18} />
-        </button>
-        <div style={{ height: 1, backgroundColor: 'var(--border-color)' }}></div>
-        <button 
-          style={{
-            width: 36,
-            height: 36,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: 'none',
-            background: 'transparent',
-            color: 'var(--text-primary)',
-            cursor: 'pointer'
-          }}
-          onClick={() => handleZoom(0.8)}
-          title="縮小"
-        >
-          <ZoomOut size={18} />
-        </button>
-      </div>
+          <button 
+            style={{
+              width: 36,
+              height: 36,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--text-primary)',
+              cursor: 'pointer'
+            }}
+            onClick={() => handleZoom(1.25)}
+            title="放大"
+          >
+            <ZoomIn size={18} />
+          </button>
+          <div style={{ height: 1, backgroundColor: 'var(--border-color)' }}></div>
+          <button 
+            style={{
+              width: 36,
+              height: 36,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--text-primary)',
+              cursor: 'pointer'
+            }}
+            onClick={() => handleZoom(0.8)}
+            title="縮小"
+          >
+            <ZoomOut size={18} />
+          </button>
+        </div>
+      )}
+
+      {/* Floating Center Pin and Top Card for Mock Mode Selection */}
+      {mapSelectingMode !== 'idle' && (
+        <>
+          {/* Top Address Resolution Glassmorphic Card */}
+          <div 
+            className="glass animate-fade-in"
+            style={{
+              position: 'absolute',
+              top: '80px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 50,
+              width: '90%',
+              maxWidth: '380px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+              background: 'rgba(15, 18, 36, 0.85)',
+              pointerEvents: 'auto'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+              <MapPin size={14} className={mapSelectingMode === 'start' ? 'text-green' : 'text-red'} />
+              <span>{mapSelectingMode === 'start' ? '設定乘車起點 (模擬模式)' : '設定下車終點 (模擬模式)'}</span>
+            </div>
+            
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'white', minHeight: '20px', lineHeight: 1.4 }}>
+              {resolvedAddress}
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <button
+                onClick={handleConfirm}
+                disabled={resolvedAddress.startsWith('正在')}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: 'var(--radius-sm)',
+                  background: mapSelectingMode === 'start' ? '#10b981' : '#ef4444',
+                  color: 'white',
+                  border: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.75rem',
+                  cursor: 'pointer'
+                }}
+              >
+                確定位置
+              </button>
+              <button
+                onClick={onCancelSelection}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  color: 'var(--text-secondary)',
+                  border: '1px solid var(--border-color)',
+                  fontWeight: 600,
+                  fontSize: '0.75rem',
+                  cursor: 'pointer'
+                }}
+              >
+                取消
+              </button>
+            </div>
+          </div>
+
+          {/* Floating Neon Pin exactly in center of map */}
+          <div
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -100%)',
+              zIndex: 50,
+              pointerEvents: 'none',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center'
+            }}
+          >
+            <div
+              className="center-pin-bounce"
+              style={{
+                fontSize: '44px',
+                lineHeight: 1,
+                filter: 'drop-shadow(0 10px 8px rgba(0,0,0,0.55))',
+                transform: 'translateY(-12px)'
+              }}
+            >
+              {mapSelectingMode === 'start' ? '📍' : '📌'}
+            </div>
+            
+            <div 
+              style={{
+                width: '12px',
+                height: '5px',
+                borderRadius: '50%',
+                background: 'rgba(0,0,0,0.5)',
+                marginTop: '-6px',
+                boxShadow: '0 0 6px rgba(0,0,0,0.8)'
+              }}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 };

@@ -39,6 +39,11 @@ export default function Home() {
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
   const [dispatchTimer, setDispatchTimer] = useState<any>(null);
 
+  // Map Pin Selection States
+  const [mapSelectingMode, setMapSelectingMode] = useState<'idle' | 'start' | 'end'>('idle');
+  const [startLatLng, setStartLatLng] = useState<{ lat: number; lng: number } | null>(null);
+  const [endLatLng, setEndLatLng] = useState<{ lat: number; lng: number } | null>(null);
+
   // Firebase Live Stream States
   const [isLiveFirestore, setIsLiveFirestore] = useState<boolean>(false);
   const [firebaseProjectName, setFirebaseProjectName] = useState<string>('');
@@ -671,7 +676,7 @@ export default function Home() {
     setBookingStatus('searching');
     setAssignedDriver(null);
 
-    // 1. Create order payload
+    // 1. Create order payload with precise Lat/Lng coordinates
     const orderData = {
       passengerId: isLoggedIn && profile ? profile.userId : "mock_user_ricky",
       passengerName: isLoggedIn && profile ? profile.displayName : "Ricky Yeh",
@@ -681,6 +686,8 @@ export default function Home() {
       carPlate: "",
       startAddress: startAddress,
       endAddress: endAddress,
+      startLatLng: startLatLng ? { lat: startLatLng.lat, lng: startLatLng.lng } : null,
+      endLatLng: endLatLng ? { lat: endLatLng.lat, lng: endLatLng.lng } : null,
       isSenior: isSenior,
       couponId: selectedCouponId || "",
       status: 1, // 1 = 待處理/已指派 (Pending/Searching)
@@ -773,6 +780,26 @@ export default function Home() {
     setCurrentOrderId(null);
   };
 
+  // Map Pin Selection Handlers
+  const handleStartMapSelection = (mode: 'start' | 'end') => {
+    setMapSelectingMode(mode);
+  };
+
+  const handleResolveAddress = (address: string, lat: number, lng: number) => {
+    if (mapSelectingMode === 'start') {
+      setStartAddress(address);
+      setStartLatLng({ lat, lng });
+    } else if (mapSelectingMode === 'end') {
+      setEndAddress(address);
+      setEndLatLng({ lat, lng });
+    }
+    setMapSelectingMode('idle');
+  };
+
+  const handleCancelSelection = () => {
+    setMapSelectingMode('idle');
+  };
+
   const hasValidKey = apiKey.startsWith('AIzaSy');
 
   return (
@@ -863,6 +890,9 @@ export default function Home() {
             onSelectLocation={handleSelectDriver}
             mapStyle={mapStyle}
             showTraffic={showTraffic}
+            mapSelectingMode={mapSelectingMode}
+            onResolveAddress={handleResolveAddress}
+            onCancelSelection={handleCancelSelection}
           />
         </APIProvider>
       ) : (
@@ -871,6 +901,9 @@ export default function Home() {
           selectedLocation={assignedDriver}
           onSelectLocation={handleSelectDriver}
           mapStyle={mapStyle}
+          mapSelectingMode={mapSelectingMode}
+          onResolveAddress={handleResolveAddress}
+          onCancelSelection={handleCancelSelection}
         />
       )}
 
@@ -886,6 +919,8 @@ export default function Home() {
           onChangeStartAddress={setStartAddress}
           endAddress={endAddress}
           onChangeEndAddress={setEndAddress}
+          mapSelectingMode={mapSelectingMode}
+          onStartMapSelection={handleStartMapSelection}
           isSenior={isSenior}
           onChangeIsSenior={setIsSenior}
           selectedCouponId={selectedCouponId}

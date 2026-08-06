@@ -1514,3 +1514,17 @@ input:checked + .slider:before {
   color: #ef4444;
 }
 
+/* Bouncy Map Pin Animations */
+.center-pin-bounce {
+  animation: centerPinBounce 1s infinite ease-in-out alternate;
+}
+
+@keyframes centerPinBounce {
+  0% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(-24px);
+  }
+}
+

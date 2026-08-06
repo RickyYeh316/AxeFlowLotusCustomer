@@ -16,7 +16,8 @@ import {
   AlertCircle,
   Clock,
   Sparkles,
-  Briefcase
+  Briefcase,
+  MapPin
 } from 'lucide-react';
 import { Driver, MapStyle } from '../types';
 import { useLiff } from '@/components/LiffProvider';
@@ -32,6 +33,10 @@ interface SidebarProps {
   onChangeStartAddress: (addr: string) => void;
   endAddress: string;
   onChangeEndAddress: (addr: string) => void;
+
+  // Selection mode
+  mapSelectingMode: 'idle' | 'start' | 'end';
+  onStartMapSelection: (mode: 'start' | 'end') => void;
 
   // Custom preferences
   isSenior: boolean;
@@ -56,6 +61,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onChangeStartAddress,
   endAddress,
   onChangeEndAddress,
+  mapSelectingMode,
+  onStartMapSelection,
   isSenior,
   onChangeIsSenior,
   selectedCouponId,
@@ -220,6 +227,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       placeholder="請輸入乘車起點..."
                       style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '0.8rem', width: '100%', outline: 'none' }}
                     />
+                    <button
+                      type="button"
+                      onClick={() => onStartMapSelection('start')}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: mapSelectingMode === 'start' ? 'var(--color-secondary)' : 'var(--text-muted)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '4px',
+                        transition: 'var(--transition-smooth)'
+                      }}
+                      title="在地圖上選點"
+                    >
+                      <MapPin size={16} className={mapSelectingMode === 'start' ? 'animate-bounce' : ''} />
+                    </button>
                   </div>
 
                   {/* End Address */}
@@ -232,6 +257,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       placeholder="請輸入下車終點..."
                       style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '0.8rem', width: '100%', outline: 'none' }}
                     />
+                    <button
+                      type="button"
+                      onClick={() => onStartMapSelection('end')}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: mapSelectingMode === 'end' ? '#ef4444' : 'var(--text-muted)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '4px',
+                        transition: 'var(--transition-smooth)'
+                      }}
+                      title="在地圖上選點"
+                    >
+                      <MapPin size={16} className={mapSelectingMode === 'end' ? 'animate-bounce' : ''} />
+                    </button>
                   </div>
                 </div>
               </div>
