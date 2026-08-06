@@ -17,15 +17,26 @@ interface MapContainerProps {
   mapSelectingMode: 'idle' | 'start' | 'end';
   onResolveAddress: (address: string, lat: number, lng: number) => void;
   onCancelSelection: () => void;
+  startLatLng: { lat: number; lng: number } | null;
 }
 
 // Sub-component to manage map panning, zoom, and layers using useMap hook
 const MapController: React.FC<{
   selectedLocation: Driver | null;
   showTraffic: boolean;
-}> = ({ selectedLocation, showTraffic }) => {
+  startLatLng: { lat: number; lng: number } | null;
+}> = ({ selectedLocation, showTraffic, startLatLng }) => {
   const map = useMap();
   const trafficLayerRef = useRef<google.maps.TrafficLayer | null>(null);
+  const initialPanRef = useRef<boolean>(false);
+
+  // Pan to user's GPS start location on initial load (one-shot)
+  useEffect(() => {
+    if (!map || !startLatLng || initialPanRef.current) return;
+    map.panTo({ lat: startLatLng.lat, lng: startLatLng.lng });
+    map.setZoom(15);
+    initialPanRef.current = true;
+  }, [map, startLatLng]);
 
   // Pan to selected driver location
   useEffect(() => {
@@ -99,6 +110,7 @@ export const MapContainer: React.FC<MapContainerProps> = ({
   mapSelectingMode,
   onResolveAddress,
   onCancelSelection,
+  startLatLng,
 }) => {
   const map = useMap();
   // Center of Taipei (approximate)
@@ -239,7 +251,7 @@ export const MapContainer: React.FC<MapContainerProps> = ({
           );
         })}
         
-        <MapController selectedLocation={selectedLocation} showTraffic={showTraffic} />
+        <MapController selectedLocation={selectedLocation} showTraffic={showTraffic} startLatLng={startLatLng} />
         
         {/* Listen for selection moves */}
         <MapSelectionListener 

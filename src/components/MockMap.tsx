@@ -14,6 +14,7 @@ interface MockMapProps {
   mapSelectingMode: 'idle' | 'start' | 'end';
   onResolveAddress: (address: string, lat: number, lng: number) => void;
   onCancelSelection: () => void;
+  startLatLng: { lat: number; lng: number } | null;
 }
 
 export const MockMap: React.FC<MockMapProps> = ({
@@ -24,6 +25,7 @@ export const MockMap: React.FC<MockMapProps> = ({
   mapSelectingMode,
   onResolveAddress,
   onCancelSelection,
+  startLatLng,
 }) => {
   // SVG Canvas view state
   const [zoom, setZoom] = useState(1);
@@ -117,6 +119,27 @@ export const MockMap: React.FC<MockMapProps> = ({
       }
     }
   }, [selectedLocation]);
+
+  const initialPanRef = useRef<boolean>(false);
+
+  // Center on user startLatLng location on load (one-shot)
+  useEffect(() => {
+    if (startLatLng && !selectedLocation && !initialPanRef.current) {
+      const { x, y } = projectCoord(startLatLng.lat, startLatLng.lng);
+      if (mapRef.current) {
+        const rect = mapRef.current.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        
+        setPan({
+          x: centerX - (x * zoom),
+          y: centerY - (y * zoom),
+        });
+        setZoom(1.3);
+        initialPanRef.current = true;
+      }
+    }
+  }, [startLatLng, selectedLocation, zoom]);
 
   // Dragging handlers
   const handleMouseDown = (e: React.MouseEvent) => {

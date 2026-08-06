@@ -104,6 +104,65 @@ export default function Home() {
     setIsLoaded(true);
   }, [envApiKey]);
 
+  // 1. Automatically retrieve user's GPS coordinates on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setStartLatLng({ lat: latitude, lng: longitude });
+
+          // Try reverse geocoding if Google Maps API is already loaded
+          try {
+            const geocoder = new google.maps.Geocoder();
+            geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results, status) => {
+              if (status === 'OK' && results && results[0]) {
+                let cleanAddress = results[0].formatted_address;
+                cleanAddress = cleanAddress
+                  .replace(/^中華民國台灣/, '')
+                  .replace(/^台灣/, '')
+                  .replace(/^\d{3,5}/, '')
+                  .trim();
+                setStartAddress(cleanAddress + ' (目前位置)');
+              } else {
+                setStartAddress(`目前位置 (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+              }
+            });
+          } catch (e) {
+            // Script not loaded yet: fallback to coordinates
+            setStartAddress(`目前位置 (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+          }
+        },
+        (error) => {
+          console.warn("GPS Geolocation access denied or failed:", error);
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+      );
+    }
+  }, []);
+
+  // 2. Delayed Geocoding: Resolve coordinate address once Google Maps script loads
+  useEffect(() => {
+    if (startLatLng && startAddress.startsWith('目前位置 (') && typeof google !== 'undefined') {
+      try {
+        const geocoder = new google.maps.Geocoder();
+        geocoder.geocode({ location: { lat: startLatLng.lat, lng: startLatLng.lng } }, (results, status) => {
+          if (status === 'OK' && results && results[0]) {
+            let cleanAddress = results[0].formatted_address;
+            cleanAddress = cleanAddress
+              .replace(/^中華民國台灣/, '')
+              .replace(/^台灣/, '')
+              .replace(/^\d{3,5}/, '')
+              .trim();
+            setStartAddress(cleanAddress + ' (目前位置)');
+          }
+        });
+      } catch (err) {
+        console.warn("Delayed GPS geocoding failed:", err);
+      }
+    }
+  }, [startLatLng, startAddress, apiKey]);
+
   // Vehicle Type Mapping Helper based on Model Name
   const mapVehicleType = (maker: string, model: string): VehicleType => {
     const combinedStr = `${maker} ${model}`.toLowerCase();
@@ -931,6 +990,7 @@ export default function Home() {
             mapSelectingMode={mapSelectingMode}
             onResolveAddress={handleResolveAddress}
             onCancelSelection={handleCancelSelection}
+            startLatLng={startLatLng}
           />
         </APIProvider>
       ) : (
@@ -942,6 +1002,7 @@ export default function Home() {
           mapSelectingMode={mapSelectingMode}
           onResolveAddress={handleResolveAddress}
           onCancelSelection={handleCancelSelection}
+          startLatLng={startLatLng}
         />
       )}
 
