@@ -251,23 +251,24 @@ export const MapContainer: React.FC<MapContainerProps> = ({
       {/* Floating Center Pin and Top Card */}
       {mapSelectingMode !== 'idle' && (
         <>
-          {/* Top Address Resolution Glassmorphic Card */}
+          {/* Bottom Address Resolution Glassmorphic Card */}
           <div 
             className="glass animate-fade-in"
             style={{
               position: 'absolute',
-              top: '80px',
+              bottom: '24px',
               left: '50%',
               transform: 'translateX(-50%)',
               zIndex: 50,
-              width: '90%',
-              maxWidth: '380px',
+              width: 'calc(100% - 32px)',
+              maxWidth: '360px',
               padding: '16px',
               display: 'flex',
               flexDirection: 'column',
               gap: 12,
-              background: 'rgba(15, 18, 36, 0.85)',
-              pointerEvents: 'auto'
+              background: 'rgba(15, 18, 36, 0.9)',
+              pointerEvents: 'auto',
+              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)'
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
