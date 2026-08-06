@@ -15,7 +15,7 @@ import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, serverTimest
 import { useLiff } from '@/components/LiffProvider';
 
 export default function Home() {
-  const { isLoggedIn, profile } = useLiff();
+  const { isLoggedIn, profile, isLoading } = useLiff();
 
   // Read keys from environment
   const envApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
@@ -805,6 +805,15 @@ export default function Home() {
   };
 
   const hasValidKey = apiKey.startsWith('AIzaSy');
+
+  if (isLoading) {
+    return (
+      <div className="liff-full-loading">
+        <div className="loading-spinner"></div>
+        <p>正在驗證 LINE 登入狀態...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">
