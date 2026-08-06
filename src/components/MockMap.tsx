@@ -461,10 +461,10 @@ export const MockMap: React.FC<MockMapProps> = ({
             style={{
               position: 'absolute',
               bottom: '50px',
-              left: '50%',
-              transform: 'translateX(-50%)',
+              left: '16px',
+              right: '16px',
+              margin: '0 auto',
               zIndex: 50,
-              width: 'calc(100% - 32px)',
               maxWidth: '360px',
               padding: '16px',
               display: 'flex',
