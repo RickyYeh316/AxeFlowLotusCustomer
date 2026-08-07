@@ -11,7 +11,7 @@ import { Driver, MapStyle, DriverStatus, VehicleType } from '@/types';
 import { db, hasFirebaseConfig, firebaseConfig as defaultEnvConfig } from '@/firebase/config';
 import { Key, AlertCircle, Play, Pause, Database, Check, UploadCloud } from 'lucide-react';
 import { initializeApp, getApps, deleteApp } from 'firebase/app';
-import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, serverTimestamp, getDoc, query, where } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, serverTimestamp, getDoc, query, where, updateDoc } from 'firebase/firestore';
 import { useLiff } from '@/components/LiffProvider';
 
 export default function Home() {
@@ -296,13 +296,16 @@ export default function Home() {
           updatedAt: new Date()
         };
 
-        if (isNewUser) {
-          // New User: Set registration timestamp and write profile
+        if (!userSnap.exists()) {
           (userData as any).createdAt = new Date();
-          await setDoc(userRef, userData);
+        }
+        await setDoc(userRef, userData, { merge: true });
+        console.log("LINE user profile synced to users collection successfully.");
 
-          // Issue Welcome Coupon: Save to coupons with unique ID to prevent double issuance
-          const couponRef = doc(activeDb, "coupons", `${profile.userId}_WELCOME100`);
+        // Automatically issue Welcome Coupon if user does not have it yet in userCoupons
+        const couponRef = doc(activeDb, "userCoupons", `${profile.userId}_WELCOME100`);
+        const couponSnap = await getDoc(couponRef);
+        if (!couponSnap.exists()) {
           const welcomeCoupon = {
             userId: profile.userId,
             couponCode: "WELCOME100",
@@ -316,12 +319,8 @@ export default function Home() {
             updatedAt: new Date()
           };
           await setDoc(couponRef, welcomeCoupon);
-          console.log("New user registered. WELCOME100 coupon issued.");
-          alert(`歡迎新加入！系統已自動發送「新戶註冊乘車券 (100元)」至您的優惠券！`);
-        } else {
-          // Existing User: Sync profile changes and update lastLoginAt using merge
-          await setDoc(userRef, userData, { merge: true });
-          console.log("LINE user profile synced to users collection successfully.");
+          console.log("Welcome coupon WELCOME100 issued for user in userCoupons:", profile.userId);
+          alert(`歡迎！系統已自動發送「新戶註冊乘車券 (100元)」至您的優惠券！`);
         }
       } catch (err) {
         console.error("Failed to sync user profile or issue welcome coupon:", err);
@@ -348,7 +347,7 @@ export default function Home() {
     if (!activeDb) return;
 
     const q = query(
-      collection(activeDb, "coupons"),
+      collection(activeDb, "userCoupons"),
       where("userId", "==", profile.userId),
       where("status", "==", "unused")
     );
@@ -646,6 +645,19 @@ export default function Home() {
         await setDoc(doc(activeDb, "coupons", item.couponCode), item);
       }
 
+      // Also issue these 3 mock coupons directly to the logged-in LINE user for instant testing!
+      if (isLoggedIn && profile) {
+        for (const item of mockCoupons) {
+          const userCouponRef = doc(activeDb, "userCoupons", `${profile.userId}_${item.couponCode}`);
+          await setDoc(userCouponRef, {
+            ...item,
+            userId: profile.userId,
+            status: "unused"
+          });
+        }
+        console.log("Mock coupons bound and issued to current logged-in user in userCoupons successfully.");
+      }
+
       // 4. Seed orders (historical trips)
       const mockOrders = [
         {
@@ -786,8 +798,18 @@ export default function Home() {
         const docRef = await addDoc(collection(activeDb, "orders"), orderData);
         createdOrderId = docRef.id;
         setCurrentOrderId(createdOrderId);
+
+        // Mark the selected coupon as used in userCoupons
+        if (selectedCouponId) {
+          const userCouponRef = doc(activeDb, "userCoupons", selectedCouponId);
+          await updateDoc(userCouponRef, {
+            status: "used",
+            updatedAt: serverTimestamp()
+          });
+          console.log(`Coupon ${selectedCouponId} marked as used in userCoupons.`);
+        }
       } catch (err) {
-        console.error("Failed to write order to Firestore:", err);
+        console.error("Failed to write order or consume coupon in Firestore:", err);
       }
     } else {
       // Local Mock Mode: generate random order ID

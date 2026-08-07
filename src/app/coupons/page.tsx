@@ -51,7 +51,7 @@ export default function CouponsPage() {
 
     // Query user specific coupons
     const q = query(
-      collection(activeDb, "coupons"),
+      collection(activeDb, "userCoupons"),
       where("userId", "==", profile.userId)
     );
 
