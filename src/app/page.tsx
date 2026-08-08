@@ -52,6 +52,7 @@ export default function Home() {
 
   // Animation/Simulation states
   const [isSimulating, setIsSimulating] = useState<boolean>(true);
+  const [showDebugControls, setShowDebugControls] = useState<boolean>(false);
   const driversRef = useRef<Driver[]>([]);
 
   // Ref to track if LINE message has been sent for a specific order to prevent duplication
@@ -103,6 +104,14 @@ export default function Home() {
     driversRef.current = mockDrivers;
     setIsLoaded(true);
   }, [envApiKey]);
+
+  // Check URL parameters for debug mode
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isDebug = new URLSearchParams(window.location.search).has('debug');
+      setShowDebugControls(isDebug);
+    }
+  }, []);
 
   // 1. Automatically retrieve user's GPS coordinates on mount
   useEffect(() => {
@@ -936,52 +945,26 @@ export default function Home() {
   return (
     <div className="app-container">
       {/* Top Floating Control Row */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 24,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 40,
-          pointerEvents: 'auto',
-          display: 'flex',
-          gap: 12
-        }}
-      >
-        {/* Status Settings Trigger Badge */}
-        <div className="glass">
-          <button
-            onClick={() => {
-              setInputApiKey(apiKey);
-              setShowConfigModal(true);
-            }}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '8px 16px',
-              color: 'var(--text-primary)',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8
-            }}
-          >
-            <Database size={14} className={isLiveFirestore ? 'text-green' : 'text-gold'} />
-            <span>
-              {isLiveFirestore
-                ? `Firestore: ${firebaseProjectName} (已連線)`
-                : 'Firestore: 模擬移動模式 (按此設定串接)'}
-            </span>
-          </button>
-        </div>
-
-        {/* Local Simulator controls */}
-        {!isLiveFirestore && (
-          <div className="glass animate-fade-in">
+      {showDebugControls && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 24,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 40,
+            pointerEvents: 'auto',
+            display: 'flex',
+            gap: 12
+          }}
+        >
+          {/* Status Settings Trigger Badge */}
+          <div className="glass">
             <button
-              onClick={() => setIsSimulating(!isSimulating)}
+              onClick={() => {
+                setInputApiKey(apiKey);
+                setShowConfigModal(true);
+              }}
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -994,23 +977,51 @@ export default function Home() {
                 alignItems: 'center',
                 gap: 8
               }}
-              title={isSimulating ? "暫停車輛移動" : "開始車輛移動"}
             >
-              {isSimulating ? (
-                <>
-                  <Pause size={14} className="text-cyan" />
-                  <span>模擬移動中</span>
-                </>
-              ) : (
-                <>
-                  <Play size={14} className="text-muted" />
-                  <span>移動已暫停</span>
-                </>
-              )}
+              <Database size={14} className={isLiveFirestore ? 'text-green' : 'text-gold'} />
+              <span>
+                {isLiveFirestore
+                  ? `Firestore: ${firebaseProjectName} (已連線)`
+                  : 'Firestore: 模擬移動模式 (按此設定串接)'}
+              </span>
             </button>
           </div>
-        )}
-      </div>
+
+          {/* Local Simulator controls */}
+          {!isLiveFirestore && (
+            <div className="glass animate-fade-in">
+              <button
+                onClick={() => setIsSimulating(!isSimulating)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '8px 16px',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8
+                }}
+                title={isSimulating ? "暫停車輛移動" : "開始車輛移動"}
+              >
+                {isSimulating ? (
+                  <>
+                    <Pause size={14} className="text-cyan" />
+                    <span>模擬移動中</span>
+                  </>
+                ) : (
+                  <>
+                    <Play size={14} className="text-muted" />
+                    <span>移動已暫停</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Main Map Area - Conditional Rendering */}
       {hasValidKey ? (
