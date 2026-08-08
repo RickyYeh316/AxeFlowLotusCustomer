@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Driver, MapStyle } from '../types';
+import { Driver, MapStyle, DriverTripStatus } from '../types';
 import { ZoomIn, ZoomOut, Compass, Info, MapPin } from 'lucide-react';
 
 interface MockMapProps {
@@ -209,7 +209,7 @@ export const MockMap: React.FC<MockMapProps> = ({
 
   const getDriverColor = (driver: Driver, isSelected: boolean) => {
     if (isSelected) return '#ff2a5f'; // Active Red
-    if (driver.status === 'busy') return '#6b7280'; // Gray for busy
+    if (driver.tripStatus !== DriverTripStatus.IDLE) return '#6b7280'; // Gray for busy/offline/dispatched/etc.
     
     if (driver.vehicleType === 'luxury') return '#111827';
     if (driver.vehicleType === 'suv') return '#0284c7';

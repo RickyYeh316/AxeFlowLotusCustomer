@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Phone, Navigation, MessageSquare, ShieldCheck, CheckCircle } from 'lucide-react';
-import { Driver } from '../types';
+import { Driver, DriverTripStatus } from '../types';
 
 interface DetailCardProps {
   location: Driver | null; // Driver (passed as location for naming compatibility)
@@ -112,10 +112,10 @@ export const DetailCard: React.FC<DetailCardProps> = ({ location: driver, onClos
               style={{
                 fontSize: '0.7rem',
                 fontWeight: 700,
-                color: driver.status === 'busy' ? '#9ca3af' : '#10b981'
+                color: driver.tripStatus !== DriverTripStatus.IDLE ? '#9ca3af' : '#10b981'
               }}
             >
-              • {driver.status === 'busy' ? '客滿中' : '空車可指派'}
+              • {driver.tripStatus !== DriverTripStatus.IDLE ? '客滿中' : '空車可指派'}
             </span>
           </div>
 
@@ -163,14 +163,14 @@ export const DetailCard: React.FC<DetailCardProps> = ({ location: driver, onClos
             <button
               className="action-btn primary"
               onClick={handleDispatch}
-              disabled={driver.status === 'busy'}
+              disabled={driver.tripStatus !== DriverTripStatus.IDLE}
               style={{
-                opacity: driver.status === 'busy' ? 0.6 : 1,
-                cursor: driver.status === 'busy' ? 'not-allowed' : 'pointer'
+                opacity: driver.tripStatus !== DriverTripStatus.IDLE ? 0.6 : 1,
+                cursor: driver.tripStatus !== DriverTripStatus.IDLE ? 'not-allowed' : 'pointer'
               }}
             >
               <Navigation size={15} />
-              <span>{driver.status === 'busy' ? '暫時客滿' : '指派此車輛'}</span>
+              <span>{driver.tripStatus !== DriverTripStatus.IDLE ? '暫時客滿' : '指派此車輛'}</span>
             </button>
             <button
               className="action-btn secondary"

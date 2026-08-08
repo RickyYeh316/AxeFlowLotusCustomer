@@ -1,4 +1,4 @@
-import { Driver } from '../types';
+import { Driver, DriverTripStatus, DriverAccountStatus } from '../types';
 
 export const mockDrivers: Driver[] = [
   {
@@ -7,7 +7,8 @@ export const mockDrivers: Driver[] = [
     lat: 25.0412,
     lng: 121.5645,
     plateNumber: 'TDY-5866',
-    status: 'online',
+    tripStatus: DriverTripStatus.IDLE,
+    accountStatus: DriverAccountStatus.ACTIVE,
     vehicleType: 'standard',
     phone: '0912-345-678',
     rating: 4.8,
@@ -22,7 +23,8 @@ export const mockDrivers: Driver[] = [
     lat: 25.0336,
     lng: 121.5432,
     plateNumber: 'TAX-9981',
-    status: 'online',
+    tripStatus: DriverTripStatus.IDLE,
+    accountStatus: DriverAccountStatus.ACTIVE,
     vehicleType: 'suv',
     phone: '0928-888-777',
     rating: 4.9,
@@ -37,7 +39,8 @@ export const mockDrivers: Driver[] = [
     lat: 25.0482,
     lng: 121.5170,
     plateNumber: 'VIP-0888',
-    status: 'online',
+    tripStatus: DriverTripStatus.IDLE,
+    accountStatus: DriverAccountStatus.ACTIVE,
     vehicleType: 'luxury',
     phone: '0975-123-456',
     rating: 5.0,
@@ -52,7 +55,8 @@ export const mockDrivers: Driver[] = [
     lat: 25.0592,
     lng: 121.5345,
     plateNumber: 'TDA-3321',
-    status: 'online',
+    tripStatus: DriverTripStatus.IDLE,
+    accountStatus: DriverAccountStatus.ACTIVE,
     vehicleType: 'standard',
     phone: '0933-456-789',
     rating: 4.7,
@@ -67,7 +71,8 @@ export const mockDrivers: Driver[] = [
     lat: 25.0256,
     lng: 121.5528,
     plateNumber: 'TDB-7762',
-    status: 'online',
+    tripStatus: DriverTripStatus.IDLE,
+    accountStatus: DriverAccountStatus.ACTIVE,
     vehicleType: 'suv',
     phone: '0911-222-333',
     rating: 4.6,

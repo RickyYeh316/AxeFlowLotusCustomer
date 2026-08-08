@@ -7,7 +7,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { DetailCard } from '@/components/DetailCard';
 import { MockMap } from '@/components/MockMap';
 import { mockDrivers } from '@/data/drivers';
-import { Driver, MapStyle, DriverStatus, VehicleType } from '@/types';
+import { Driver, MapStyle, DriverTripStatus, DriverAccountStatus, UserTripStatus, UserAccountStatus, VehicleType } from '@/types';
 import { db, hasFirebaseConfig, firebaseConfig as defaultEnvConfig } from '@/firebase/config';
 import { Key, AlertCircle, Play, Pause, Database, Check, UploadCloud } from 'lucide-react';
 import { initializeApp, getApps, deleteApp } from 'firebase/app';
@@ -236,11 +236,21 @@ export default function Home() {
 
         // Only display drivers that have active locations
         if (data.currentLocation && typeof data.currentLocation.lat === 'number') {
-          let status: DriverStatus = 'offline';
-          if (data.status === 1 || data.working === true) {
-            status = 'online';
-          } else if (data.status === 2 || data.isWorking === true) {
-            status = 'busy';
+          let tripStatus = DriverTripStatus.OFFLINE;
+          if (data.tripStatus) {
+            tripStatus = data.tripStatus as DriverTripStatus;
+          } else {
+            // Fallback for older driver schema
+            if (data.status === 1 || data.working === true) {
+              tripStatus = DriverTripStatus.IDLE;
+            } else if (data.status === 2 || data.isWorking === true) {
+              tripStatus = DriverTripStatus.IN_SERVICE;
+            }
+          }
+
+          let accountStatus = DriverAccountStatus.ACTIVE;
+          if (data.accountStatus) {
+            accountStatus = data.accountStatus as DriverAccountStatus;
           }
 
           const mappedDriver: Driver = {
@@ -250,7 +260,8 @@ export default function Home() {
             lng: data.currentLocation.lng,
             heading: data.currentLocation.bearing || 0,
             plateNumber: data.carPlate || "未填寫車牌",
-            status,
+            tripStatus,
+            accountStatus,
             vehicleType: mapVehicleType(data.carMaker || '', data.carModel || ''),
             phone: data.phone || "無電話",
             rating: data.rating || 4.9,
@@ -295,7 +306,7 @@ export default function Home() {
         const userSnap = await getDoc(userRef);
         const isNewUser = !userSnap.exists();
 
-        const userData = {
+        const userData: any = {
           userId: profile.userId,
           displayName: profile.displayName,
           pictureUrl: profile.pictureUrl || "",
@@ -305,8 +316,10 @@ export default function Home() {
           updatedAt: new Date()
         };
 
-        if (!userSnap.exists()) {
-          (userData as any).createdAt = new Date();
+        if (isNewUser) {
+          userData.createdAt = new Date();
+          userData.tripStatus = UserTripStatus.IDLE;
+          userData.accountStatus = UserAccountStatus.ACTIVE;
         }
         await setDoc(userRef, userData, { merge: true });
         console.log("LINE user profile synced to users collection successfully.");
@@ -497,6 +510,8 @@ export default function Home() {
           status: 1,
           working: true,
           isWorking: false,
+          tripStatus: "IDLE",
+          accountStatus: "ACTIVE",
           loginCount: 15,
           currentLocation: {
             lat: 25.0412,
@@ -521,6 +536,8 @@ export default function Home() {
           status: 1,
           working: true,
           isWorking: false,
+          tripStatus: "IDLE",
+          accountStatus: "ACTIVE",
           loginCount: 34,
           currentLocation: {
             lat: 25.0336,
@@ -545,6 +562,8 @@ export default function Home() {
           status: 1,
           working: true,
           isWorking: false,
+          tripStatus: "IDLE",
+          accountStatus: "ACTIVE",
           loginCount: 52,
           currentLocation: {
             lat: 25.0482,
@@ -569,6 +588,8 @@ export default function Home() {
           status: 1,
           working: true,
           isWorking: false,
+          tripStatus: "IDLE",
+          accountStatus: "ACTIVE",
           loginCount: 28,
           currentLocation: {
             lat: 25.0592,
@@ -595,6 +616,8 @@ export default function Home() {
           pictureUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
           statusMessage: "Lotus Customer!",
           role: "passenger",
+          tripStatus: "IDLE",
+          accountStatus: "ACTIVE",
           createdAt: new Date(),
           updatedAt: new Date()
         },
@@ -604,6 +627,8 @@ export default function Home() {
           pictureUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80",
           statusMessage: "每天搭乘優質計程車",
           role: "passenger",
+          tripStatus: "IDLE",
+          accountStatus: "ACTIVE",
           createdAt: new Date(),
           updatedAt: new Date()
         }
@@ -829,7 +854,7 @@ export default function Home() {
     // 2. Simulate Driver Acceptance Timer (5 seconds)
     const timer = setTimeout(async () => {
       // Select a random driver from current list of online drivers
-      const availableDriversList = driversRef.current.filter(d => d.status === 'online');
+      const availableDriversList = driversRef.current.filter(d => d.tripStatus === DriverTripStatus.IDLE);
       const fallbackList = driversRef.current.length > 0 ? driversRef.current : mockDrivers;
       const pool = availableDriversList.length > 0 ? availableDriversList : fallbackList;
       const selected = pool[Math.floor(Math.random() * pool.length)];

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Map, useMap, AdvancedMarker } from '@vis.gl/react-google-maps';
-import { Driver, MapStyle } from '../types';
+import { Driver, MapStyle, DriverTripStatus } from '../types';
 import { mapStyles } from '../data/mapStyles';
 import { MapPin } from 'lucide-react';
 
@@ -162,7 +162,7 @@ export const MapContainer: React.FC<MapContainerProps> = ({
 
   // Custom marker styles
   const getMarkerBgColor = (driver: Driver) => {
-    if (driver.status === 'busy') return '#6b7280'; // Gray for busy
+    if (driver.tripStatus !== DriverTripStatus.IDLE) return '#6b7280'; // Gray for busy/offline/dispatched/etc.
     
     if (driver.vehicleType === 'luxury') return '#111827'; // Dark grey/black for luxury
     if (driver.vehicleType === 'suv') return '#0284c7'; // Blue for SUV
