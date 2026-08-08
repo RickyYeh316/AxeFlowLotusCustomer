@@ -236,19 +236,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       type="button"
                       onClick={() => onStartMapSelection('start')}
                       style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: mapSelectingMode === 'start' ? 'var(--color-secondary)' : 'var(--text-muted)',
+                        background: mapSelectingMode === 'start' ? '#10b981' : 'rgba(16, 185, 129, 0.12)',
+                        border: mapSelectingMode === 'start' ? '1px solid #10b981' : '1px solid rgba(16, 185, 129, 0.3)',
+                        color: mapSelectingMode === 'start' ? '#000' : '#10b981',
+                        borderRadius: '6px',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        padding: '4px',
-                        transition: 'var(--transition-smooth)'
+                        width: '32px',
+                        height: '32px',
+                        flexShrink: 0,
+                        transition: 'all 0.2s ease',
+                        boxShadow: mapSelectingMode === 'start' ? '0 0 10px rgba(16, 185, 129, 0.4)' : 'none'
+                      }}
+                      onMouseOver={(e) => {
+                        if (mapSelectingMode !== 'start') {
+                          e.currentTarget.style.background = 'rgba(16, 185, 129, 0.25)';
+                          e.currentTarget.style.transform = 'scale(1.05)';
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        if (mapSelectingMode !== 'start') {
+                          e.currentTarget.style.background = 'rgba(16, 185, 129, 0.12)';
+                          e.currentTarget.style.transform = 'scale(1)';
+                        }
                       }}
                       title="在地圖上選點"
                     >
-                      <MapPin size={16} className={mapSelectingMode === 'start' ? 'animate-bounce' : ''} />
+                      <MapPin size={18} className={mapSelectingMode === 'start' ? 'animate-bounce' : ''} />
                     </button>
                   </div>
 
@@ -266,19 +282,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       type="button"
                       onClick={() => onStartMapSelection('end')}
                       style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: mapSelectingMode === 'end' ? '#ef4444' : 'var(--text-muted)',
+                        background: mapSelectingMode === 'end' ? '#ef4444' : 'rgba(239, 68, 68, 0.12)',
+                        border: mapSelectingMode === 'end' ? '1px solid #ef4444' : '1px solid rgba(239, 68, 68, 0.3)',
+                        color: mapSelectingMode === 'end' ? '#fff' : '#ef4444',
+                        borderRadius: '6px',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        padding: '4px',
-                        transition: 'var(--transition-smooth)'
+                        width: '32px',
+                        height: '32px',
+                        flexShrink: 0,
+                        transition: 'all 0.2s ease',
+                        boxShadow: mapSelectingMode === 'end' ? '0 0 10px rgba(239, 68, 68, 0.4)' : 'none'
+                      }}
+                      onMouseOver={(e) => {
+                        if (mapSelectingMode !== 'end') {
+                          e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)';
+                          e.currentTarget.style.transform = 'scale(1.05)';
+                        }
+                      }}
+                      onMouseOut={(e) => {
+                        if (mapSelectingMode !== 'end') {
+                          e.currentTarget.style.background = 'rgba(239, 68, 68, 0.12)';
+                          e.currentTarget.style.transform = 'scale(1)';
+                        }
                       }}
                       title="在地圖上選點"
                     >
-                      <MapPin size={16} className={mapSelectingMode === 'end' ? 'animate-bounce' : ''} />
+                      <MapPin size={18} className={mapSelectingMode === 'end' ? 'animate-bounce' : ''} />
                     </button>
                   </div>
                 </div>
