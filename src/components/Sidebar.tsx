@@ -230,7 +230,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       value={startAddress}
                       onChange={(e) => onChangeStartAddress(e.target.value)}
                       placeholder="請輸入乘車起點..."
-                      style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '0.8rem', width: '100%', outline: 'none' }}
+                      style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '16px', width: '100%', outline: 'none' }}
                     />
                     <button
                       type="button"
@@ -276,7 +276,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       value={endAddress}
                       onChange={(e) => onChangeEndAddress(e.target.value)}
                       placeholder="請輸入下車終點..."
-                      style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '0.8rem', width: '100%', outline: 'none' }}
+                      style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '16px', width: '100%', outline: 'none' }}
                     />
                     <button
                       type="button"
@@ -354,7 +354,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         borderRadius: 'var(--radius-sm)',
                         padding: '8px 12px',
                         color: 'white',
-                        fontSize: '0.75rem',
+                        fontSize: '16px',
                         outline: 'none',
                         cursor: 'pointer',
                         width: '100%'

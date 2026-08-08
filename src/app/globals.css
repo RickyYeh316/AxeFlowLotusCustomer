@@ -855,7 +855,7 @@ input:checked + .slider:before {
     padding: 12px;
     gap: 12px;
     height: 100%;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .sidebar-container {
