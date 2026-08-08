@@ -859,10 +859,10 @@ input:checked + .slider:before {
   }
 
   .sidebar-container {
-    position: relative;
-    top: 0;
-    left: 0;
-    width: 100%;
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    width: calc(100% - 24px);
     height: 60%;
     z-index: 20;
     transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
@@ -870,6 +870,11 @@ input:checked + .slider:before {
 
   .sidebar-container.collapsed {
     transform: translateY(calc(-100% - 12px));
+  }
+
+  .sidebar-content {
+    height: 100%;
+    overflow-y: auto !important; /* Enable inner scrolling on mobile */
   }
 
   .sidebar-toggle {
