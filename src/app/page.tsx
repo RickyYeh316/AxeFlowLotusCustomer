@@ -860,42 +860,20 @@ export default function Home() {
       setCurrentOrderId(createdOrderId);
     }
 
-    // 2. Simulate Driver Acceptance Timer (5 seconds)
-    const timer = setTimeout(async () => {
-      // Select a random driver from current list of online drivers
-      const availableDriversList = driversRef.current.filter(d => d.tripStatus === DriverTripStatus.IDLE);
-      const fallbackList = driversRef.current.length > 0 ? driversRef.current : mockDrivers;
-      const pool = availableDriversList.length > 0 ? availableDriversList : fallbackList;
-      const selected = pool[Math.floor(Math.random() * pool.length)];
-
-      if (!selected) return;
-
-      if (activeDb && createdOrderId) {
-        // Update the order in Firestore
-        try {
-          const orderRef = doc(activeDb, "orders", createdOrderId);
-          await setDoc(orderRef, {
-            driverId: selected.id,
-            driverName: selected.name,
-            carPlate: selected.plateNumber,
-            status: "IN_PROGRESS",
-            statusText: "司機接單前往中",
-            updatedAt: serverTimestamp()
-          }, { merge: true });
-        } catch (err) {
-          console.error("Failed to update order with driver:", err);
+    // 2. Simulate Driver Acceptance Timer (Disabled in Firebase Mode, handled by Cloud Functions)
+    if (!activeDb) {
+      const timer = setTimeout(async () => {
+        const pool = mockDrivers;
+        const selected = pool[Math.floor(Math.random() * pool.length)];
+        if (selected) {
+          setAssignedDriver(selected);
+          setBookingStatus('assigned');
+          sendOrderMatchedLineMessage(createdOrderId, selected);
+          alert(`[模擬] 司機已接單！為您媒合到：${selected.name} 司機，車牌 ${selected.plateNumber}。`);
         }
-      } else {
-        // Local Mock Mode update
-        setAssignedDriver(selected);
-        setBookingStatus('assigned');
-        sendOrderMatchedLineMessage(createdOrderId, selected);
-      }
-
-      alert(`司機已接單！為您媒合到：${selected.name} 司機，車牌 ${selected.plateNumber}。`);
-    }, 5000);
-
-    setDispatchTimer(timer);
+      }, 5000);
+      setDispatchTimer(timer);
+    }
   };
 
   // Cancel Booking Flow - Cancel order in Firestore and reset local states
