@@ -62,17 +62,33 @@ export default function OrdersPage() {
       const ordersList: Order[] = [];
       snapshot.forEach((doc) => {
         const data = doc.data();
+        
+        // Status mapping helper for string/number compatibility
+        const mapStatusToNumber = (status: any): number => {
+          if (typeof status === 'number') return status;
+          if (typeof status === 'string') {
+            switch (status.toUpperCase()) {
+              case 'CANCELLED': return 0;
+              case 'PENDING': return 1;
+              case 'COMPLETED': return 2;
+              case 'IN_PROGRESS': return 3;
+              default: return 1;
+            }
+          }
+          return 1;
+        };
+
         ordersList.push({
           id: doc.id,
-          passengerId: data.passengerId,
-          passengerName: data.passengerName,
-          driverId: data.driverId,
-          driverName: data.driverName,
-          carPlate: data.carPlate,
+          passengerId: data.passengerId || data.userId || '',
+          passengerName: data.passengerName || '乘客',
+          driverId: data.driverId || '',
+          driverName: data.driverName || '未分配',
+          carPlate: data.carPlate || '未填寫',
           startAddress: data.startAddress || '未填寫起點',
           endAddress: data.endAddress || '未填寫終點',
-          status: typeof data.status === 'number' ? data.status : 1,
-          statusText: data.statusText || '處理中',
+          status: mapStatusToNumber(data.status),
+          statusText: data.statusText || (data.status === 'IN_PROGRESS' ? '司機接單前往中' : '處理中'),
           fare: data.fare,
           createdAt: data.createdAt
         });

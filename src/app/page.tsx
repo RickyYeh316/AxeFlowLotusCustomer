@@ -408,7 +408,7 @@ export default function Home() {
       if (!docSnap.exists()) return;
       const data = docSnap.data();
 
-      if (data.status === 0) {
+      if (data.status === 0 || data.status === 'CANCELLED') {
         // Order cancelled
         setBookingStatus('idle');
         setAssignedDriver(null);
@@ -806,24 +806,33 @@ export default function Home() {
     setBookingStatus('searching');
     setAssignedDriver(null);
 
-    // 1. Create order payload with precise Lat/Lng coordinates
+    const readableId = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // 1. Create order payload with the requested exact structure and backwards compatibility
     const orderData = {
+      // Requested structure
+      createdAt: serverTimestamp(),
+      destination: endLatLng ? { lat: endLatLng.lat, lng: endLatLng.lng } : { lat: 25.0482, lng: 121.5170 },
+      driverId: "",
+      isElderlyCare: isSenior,
+      isNPC: false,
+      isScheduled: false,
+      pickupLocation: startLatLng ? { lat: startLatLng.lat, lng: startLatLng.lng } : { lat: 25.0412, lng: 121.5645 },
+      readableId: readableId,
+      status: "PENDING",
+      updatedAt: serverTimestamp(),
+      userId: isLoggedIn && profile ? profile.userId : "NPC-USER-4993",
+
+      // Backwards compatibility fields for the current UI/queries
       passengerId: isLoggedIn && profile ? profile.userId : "mock_user_ricky",
       passengerName: isLoggedIn && profile ? profile.displayName : "Ricky Yeh",
       passengerAvatar: isLoggedIn && profile ? (profile.pictureUrl || "") : "",
-      driverId: "", // Empty initially! No driver has accepted yet.
       driverName: "",
       carPlate: "",
       startAddress: startAddress,
       endAddress: endAddress,
-      startLatLng: startLatLng ? { lat: startLatLng.lat, lng: startLatLng.lng } : null,
-      endLatLng: endLatLng ? { lat: endLatLng.lat, lng: endLatLng.lng } : null,
-      isSenior: isSenior,
       couponId: selectedCouponId || "",
-      status: 1, // 1 = 待處理/已指派 (Pending/Searching)
-      statusText: "尋找司機中...",
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+      statusText: "尋找司機中..."
     };
 
     let createdOrderId = "";
@@ -869,7 +878,7 @@ export default function Home() {
             driverId: selected.id,
             driverName: selected.name,
             carPlate: selected.plateNumber,
-            status: 3, // 3 = 行程中/前往接駁中 (Driving/En Route)
+            status: "IN_PROGRESS",
             statusText: "司機接單前往中",
             updatedAt: serverTimestamp()
           }, { merge: true });
@@ -907,7 +916,7 @@ export default function Home() {
       try {
         const orderRef = doc(activeDb, "orders", currentOrderId);
         await setDoc(orderRef, {
-          status: 0, // 0 = 已取消
+          status: "CANCELLED",
           statusText: "訂單已取消",
           updatedAt: serverTimestamp()
         }, { merge: true });
