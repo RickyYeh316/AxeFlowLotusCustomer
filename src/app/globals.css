@@ -902,6 +902,14 @@ input:checked + .slider:before {
     max-height: 40%;
     overflow-y: auto;
   }
+
+  .bottom-nav-container {
+    display: flex !important;
+  }
+
+  .orders-list, .coupons-list {
+    padding-bottom: 90px !important;
+  }
 }
 
 /* ==========================================
@@ -1533,3 +1541,7 @@ input:checked + .slider:before {
   }
 }
 
+/* Bottom Navigation Bar for Mobile */
+.bottom-nav-container {
+  display: none !important;
+}

@@ -483,7 +483,7 @@ export const MockMap: React.FC<MockMapProps> = ({
             className="glass animate-fade-in"
             style={{
               position: 'absolute',
-              bottom: '50px',
+              bottom: '80px',
               left: '16px',
               right: '16px',
               margin: '0 auto',
