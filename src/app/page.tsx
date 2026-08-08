@@ -889,6 +889,18 @@ export default function Home() {
 
   // Map Pin Selection Handlers
   const handleStartMapSelection = (mode: 'start' | 'end') => {
+    // Force blur active input to close mobile virtual keyboard
+    if (typeof document !== 'undefined') {
+      const activeEl = document.activeElement as HTMLElement;
+      if (activeEl && typeof activeEl.blur === 'function') {
+        activeEl.blur();
+      }
+      // Force reset page scroll to top to fix iOS viewport shift bug
+      window.scrollTo(0, 0);
+      document.body.scrollTop = 0;
+      document.documentElement.scrollTop = 0;
+    }
+
     setMapSelectingMode(mode);
     setIsSidebarCollapsed(true); // 自動收起側邊欄，釋放全螢幕視野
   };
