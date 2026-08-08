@@ -216,6 +216,11 @@ html, body {
    Sidebar & Interactive Controls Style
    ========================================== */
 
+/* Bottom Navigation Bar base style (hide by default) */
+.bottom-nav-container {
+  display: none !important;
+}
+
 .sidebar-container {
   position: absolute;
   top: 24px;
@@ -1541,7 +1546,4 @@ input:checked + .slider:before {
   }
 }
 
-/* Bottom Navigation Bar for Mobile */
-.bottom-nav-container {
-  display: none !important;
-}
+
