@@ -7,6 +7,7 @@ import { db } from '@/firebase/config';
 import { getFirestore, collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { getApps } from 'firebase/app';
 import { Calendar, MapPin, Navigation, User, ChevronRight, ArrowLeft } from 'lucide-react';
+import { OrderStatus } from '@/types';
 
 interface Order {
   id: string;
@@ -67,15 +68,51 @@ export default function OrdersPage() {
         const mapStatusToNumber = (status: any): number => {
           if (typeof status === 'number') return status;
           if (typeof status === 'string') {
-            switch (status.toUpperCase()) {
-              case 'CANCELLED': return 0;
-              case 'PENDING': return 1;
-              case 'COMPLETED': return 2;
-              case 'IN_PROGRESS': return 3;
-              default: return 1;
+            const normalized = status.toUpperCase();
+            switch (normalized) {
+              case 'CANCELLED':
+              case OrderStatus.CANCELLED_BY_USER:
+              case OrderStatus.DRIVER_CANCELLED:
+              case OrderStatus.NO_SHOW:
+              case OrderStatus.FAILED_MATCH:
+                return 0;
+              case 'PENDING':
+              case OrderStatus.PENDING:
+              case OrderStatus.MATCHING:
+              case OrderStatus.ACCEPTED:
+              case OrderStatus.ARRIVED:
+                return 1;
+              case 'COMPLETED':
+              case OrderStatus.COMPLETED:
+                return 2;
+              case 'IN_PROGRESS':
+              case OrderStatus.IN_PROGRESS:
+                return 3;
+              default:
+                return 1;
             }
           }
           return 1;
+        };
+
+        const getFallbackStatusText = (status: any): string => {
+          if (typeof status === 'string') {
+            const normalized = status.toUpperCase();
+            switch (normalized) {
+              case OrderStatus.PENDING: return '等待派車';
+              case OrderStatus.MATCHING: return '系統配車中';
+              case OrderStatus.ACCEPTED: return '司機已接單';
+              case OrderStatus.ARRIVED: return '司機已抵達';
+              case OrderStatus.IN_PROGRESS: return '行程進行中';
+              case OrderStatus.COMPLETED: return '已完成';
+              case OrderStatus.CANCELLED_BY_USER: return '乘客取消';
+              case OrderStatus.DRIVER_CANCELLED: return '司機取消';
+              case OrderStatus.NO_SHOW: return '乘客未搭乘';
+              case OrderStatus.FAILED_MATCH: return '配車失敗';
+              case 'CANCELLED': return '已取消';
+            }
+          }
+          return '處理中';
         };
 
         ordersList.push({
@@ -88,7 +125,7 @@ export default function OrdersPage() {
           startAddress: data.startAddress || '未填寫起點',
           endAddress: data.endAddress || '未填寫終點',
           status: mapStatusToNumber(data.status),
-          statusText: data.statusText || (data.status === 'IN_PROGRESS' ? '司機接單前往中' : '處理中'),
+          statusText: data.statusText || getFallbackStatusText(data.status),
           fare: data.fare,
           createdAt: data.createdAt
         });

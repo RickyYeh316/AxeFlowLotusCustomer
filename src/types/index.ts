@@ -1,5 +1,18 @@
 export type VehicleType = 'standard' | 'suv' | 'luxury';
 
+export enum OrderStatus {
+  PENDING = "PENDING",             // 用戶送出叫車 (即時/預約)
+  MATCHING = "MATCHING",           // 系統開始派車
+  ACCEPTED = "ACCEPTED",           // 司機接單
+  ARRIVED = "ARRIVED",             // 司機抵達
+  IN_PROGRESS = "IN_PROGRESS",     // 搭乘中
+  COMPLETED = "COMPLETED",         // 行程結束
+  CANCELLED_BY_USER = "CANCELLED_BY_USER", // 用戶取消
+  DRIVER_CANCELLED = "DRIVER_CANCELLED",   // 司機接單後取消
+  NO_SHOW = "NO_SHOW",             // 司機標記用戶棄單
+  FAILED_MATCH = "FAILED_MATCH",   // 媒合失敗 (無人接單)
+}
+
 export enum DriverTripStatus {
   OFFLINE = "OFFLINE", // 未上線/未報班
   IDLE = "IDLE", // 上線空車中

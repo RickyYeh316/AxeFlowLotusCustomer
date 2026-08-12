@@ -7,7 +7,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { DetailCard } from '@/components/DetailCard';
 import { MockMap } from '@/components/MockMap';
 import { mockDrivers } from '@/data/drivers';
-import { Driver, MapStyle, DriverTripStatus, DriverAccountStatus, UserTripStatus, UserAccountStatus, VehicleType } from '@/types';
+import { Driver, MapStyle, DriverTripStatus, DriverAccountStatus, UserTripStatus, UserAccountStatus, VehicleType, OrderStatus } from '@/types';
 import { db, hasFirebaseConfig, firebaseConfig as defaultEnvConfig } from '@/firebase/config';
 import { Key, AlertCircle, Play, Pause, Database, Check, UploadCloud } from 'lucide-react';
 import { initializeApp, getApps, deleteApp } from 'firebase/app';
@@ -407,15 +407,46 @@ export default function Home() {
     const unsubscribe = onSnapshot(doc(activeDb, "orders", currentOrderId), (docSnap) => {
       if (!docSnap.exists()) return;
       const data = docSnap.data();
+      const statusStr = String(data.status || '').toUpperCase();
 
-      if (data.status === 0 || data.status === 'CANCELLED') {
+      const isCancelled =
+        data.status === 0 ||
+        statusStr === 'CANCELLED' ||
+        statusStr === OrderStatus.CANCELLED_BY_USER ||
+        statusStr === OrderStatus.DRIVER_CANCELLED ||
+        statusStr === OrderStatus.FAILED_MATCH ||
+        statusStr === OrderStatus.NO_SHOW;
+
+      const isCompleted =
+        data.status === 2 ||
+        statusStr === OrderStatus.COMPLETED;
+
+      if (isCancelled) {
         // Order cancelled
         setBookingStatus('idle');
         setAssignedDriver(null);
         setCurrentOrderId(null);
+
+        // Show customized alert message
+        let alertMessage = "您的叫車訂單已被取消。";
+        if (statusStr === OrderStatus.DRIVER_CANCELLED) {
+          alertMessage = "🚖 司機已取消此趟行程預約，請您重新嘗試叫車。";
+        } else if (statusStr === OrderStatus.FAILED_MATCH) {
+          alertMessage = "❌ 很抱歉，系統配車超時且目前無空閒司機，已為您取消本次媒合。";
+        } else if (statusStr === OrderStatus.NO_SHOW) {
+          alertMessage = "⚠️ 司機回報您未抵達上車地點，本次訂單已取消。";
+        } else if (statusStr === OrderStatus.CANCELLED_BY_USER) {
+          alertMessage = "您已成功取消本次叫車。";
+        }
+        alert(alertMessage);
+      } else if (isCompleted) {
+        // Order completed
+        setBookingStatus('idle');
+        setAssignedDriver(null);
+        setCurrentOrderId(null);
+        alert("🎉 行程已順利完成，感謝您的搭乘！");
       } else if (data.driverId) {
-        // Driver accepted the order!
-        // Find driver details from current list of drivers
+        // Driver accepted/assigned
         const foundDriver = driversRef.current.find(d => d.id === data.driverId) || mockDrivers.find(d => d.id === data.driverId);
         if (foundDriver) {
           setAssignedDriver(foundDriver);
@@ -821,7 +852,7 @@ export default function Home() {
       readableId: readableId,
       status: "PENDING",
       updatedAt: serverTimestamp(),
-      userId: isLoggedIn && profile ? profile.userId : "NPC-USER-4993",
+      userId: isLoggedIn && profile ? profile.userId : "mock_user_ricky",
 
       // Backwards compatibility fields for the current UI/queries
       passengerId: isLoggedIn && profile ? profile.userId : "mock_user_ricky",
